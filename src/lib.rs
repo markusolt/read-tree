@@ -157,6 +157,18 @@ impl<T> Sapling<T> {
 
         Ok(Tree { verts: self.verts })
     }
+
+    /// Builds the sapling into a tree with multiple root nodes.
+    ///
+    /// Consumes the sapling in the process. Fails when the sapling is
+    /// incomplete.
+    pub fn build_polytree(self) -> Result<PolyTree<T>, (Sapling<T>, Error)> {
+        if !self.is_ready() {
+            return Err((self, Error::Incomplete));
+        }
+
+        Ok(PolyTree { verts: self.verts })
+    }
 }
 
 /// A read-only tree data structure.
@@ -175,6 +187,23 @@ impl<T> Tree<T> {
     /// to `&vec[..]` for a [Vec][std::vec::Vec] `vec`.
     pub fn root(&self) -> Node<'_, T> {
         Node {
+            verts: &self.verts[..],
+        }
+    }
+}
+
+/// A read-only tree data structure with multiple root nodes.
+///
+/// Similar to [Tree][Tree], but does not necessarily have a unique root node.
+#[derive(Debug)]
+pub struct PolyTree<T> {
+    verts: Vec<Vertex<T>>,
+}
+
+impl<T> PolyTree<T> {
+    /// Returns an iterator over the root nodes of the poly-tree.
+    pub fn roots(&self) -> Children<'_, T> {
+        Children {
             verts: &self.verts[..],
         }
     }
