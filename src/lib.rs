@@ -236,4 +236,56 @@ mod test_sapling {
     fn test_small() -> Result<(), Error> {
         small().map(|_| ())
     }
+
+    #[test]
+    fn test_err() -> Result<(), Error> {
+        let mut sap = Sapling::<usize>::new();
+        sap.pop().unwrap_err();
+
+        let mut sap = Sapling::new();
+        sap.push_leaf(0)?;
+        sap.push_leaf(0).unwrap_err();
+
+        let mut sap = Sapling::new();
+        sap.push(0)?;
+        sap.pop()?;
+        sap.push(0).unwrap_err();
+
+        let sap = Sapling::<usize>::new();
+        sap.build().unwrap_err();
+
+        let mut sap = Sapling::new();
+        sap.push(0)?;
+        sap.build().unwrap_err();
+
+        let mut sap = Sapling::new();
+        sap.push(0)?;
+        sap.push(0)?;
+        sap.pop()?;
+        sap.build().unwrap_err();
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_clear() -> Result<(), Error> {
+        let mut sap = Sapling::new();
+        sap.push(0)?;
+        sap.clear();
+        sap.build().unwrap_err();
+
+        let mut sap = Sapling::new();
+        sap.push(0)?;
+        sap.clear();
+        sap.push_leaf(0)?;
+        sap.build()?;
+
+        let mut sap = Sapling::new();
+        sap.push_leaf(0)?;
+        sap.clear();
+        sap.push_leaf(0)?;
+        sap.build()?;
+
+        Ok(())
+    }
 }
