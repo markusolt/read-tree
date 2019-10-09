@@ -44,3 +44,135 @@
 //! ```
 
 #![deny(missing_docs)]
+
+/// An error enum returned by [Sapling][Sapling] for various mutating
+/// operations.
+#[derive(Debug)]
+pub enum Error {
+    /// Failed to add a new node to a sapling. Occurs when the root node has
+    /// already been closed and creating a new node would create a second root
+    /// in the sapling.
+    Push,
+
+    /// Failed to close the current node. Occurs when there is no selected node.
+    Pop,
+
+    /// Sapling is incomplete. Occurs when trying to build an incomplete
+    /// sapling.
+    NotComplete,
+}
+
+#[derive(Debug)]
+struct Vertex<T> {
+    len: usize,
+    data: T,
+}
+
+/// A build struct to construct new [Tree][Tree]s.
+#[derive(Debug)]
+pub struct Sapling<T> {
+    path: Vec<usize>,
+    verts: Vec<Vertex<T>>,
+}
+
+impl<T> Sapling<T> {
+    /// Creates a new empty sapling.
+    ///
+    /// Saplings are used to create [Tree][Tree]s. Add nodes using `push(_)` and
+    /// `pop()`. Then `build()` the sapling into a tree.
+    pub fn new() -> Self {
+        Sapling {
+            path: Vec::new(),
+            verts: Vec::new(),
+        }
+    }
+
+    /// Adds a new node carrying `data` to the sapling.
+    ///
+    /// Selects the new node. Fails when no node is selected.
+    pub fn push(&mut self, data: T) -> Result<(), Error> {
+        if self.complete() {
+            return Err(Error::Push);
+        }
+
+        self.path.push(self.verts.len());
+        self.verts.push(Vertex { len: 0, data });
+        Ok(())
+    }
+
+    /// Adds a new node carrying `data` to the sapling.
+    ///
+    /// Does not change selection. The new node will not have any children.
+    /// Fails when no node is selected.
+    pub fn push_leaf(&mut self, data: T) -> Result<(), Error> {
+        if self.complete() {
+            return Err(Error::Push);
+        }
+
+        self.verts.push(Vertex { len: 0, data });
+        Ok(())
+    }
+
+    /// Attaches another tree to the selected node.
+    ///
+    /// Returns an empty sapling that is reusing the internal buffer of the
+    /// consumed tree.
+    pub fn push_tree(&mut self, other: Tree<T>) -> Result<Sapling<T>, Error> {
+        if self.complete() {
+            return Err(Error::Push);
+        }
+
+        let mut verts = other.verts;
+        self.verts.append(&mut verts);
+        Ok(Sapling {
+            path: Vec::new(),
+            verts,
+        })
+    }
+
+    /// Closes the selected node.
+    ///
+    /// Selects the parent of the closed node. Fails when no node is selected.
+    pub fn pop(&mut self) -> Result<(), Error> {
+        let i = self.path.pop().ok_or(Error::Pop)?;
+        self.verts[i].len = self.verts.len() - i - 1;
+        Ok(())
+    }
+
+    /// Removes all nodes from the sapling, making it empty.
+    pub fn clear(&mut self) {
+        self.path.clear();
+        self.verts.clear();
+    }
+
+    /// Returns `true` if the sapling has no nodes.
+    pub fn empty(&self) -> bool {
+        self.verts.is_empty()
+    }
+
+    /// Return `true` if the sapling is ready to be built.
+    pub fn complete(&self) -> bool {
+        self.path.is_empty() && !self.verts.is_empty()
+    }
+
+    /// Builds the sapling into a tree.
+    ///
+    /// Consumes the sapling in the process. Fails when the sapling is
+    /// incomplete.
+    pub fn build(self) -> Result<Tree<T>, Error> {
+        if !self.complete() {
+            return Err(Error::NotComplete);
+        }
+
+        Ok(Tree { verts: self.verts })
+    }
+}
+
+/// A read-only tree data structure.
+///
+/// Trees a created by [Sapling][Sapling]s. Most interactions with trees happen
+/// on slices of them called [Node][Node]s.
+#[derive(Debug)]
+pub struct Tree<T> {
+    verts: Vec<Vertex<T>>,
+}
