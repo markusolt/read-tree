@@ -1,0 +1,16 @@
+{
+    "folders":
+    [
+        {
+            "path": ".",
+        }
+    ],
+    "build_systems": [
+        {
+            "name": "cargo check",
+            "shell_cmd": "cargo check --message-format=short && cargo check --tests --message-format=short && cargo fmt && cargo doc --message-format=short",
+            "working_dir": "$project_path/",
+            "file_regex": "^([^:]+):(\\d+):(\\d+): (.+)$"
+        }
+    ]
+}
