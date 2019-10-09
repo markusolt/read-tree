@@ -179,7 +179,10 @@ pub struct Tree<T> {
 }
 
 impl<T> Tree<T> {
-    /// Returns the root node of the tree.
+    /// Returns the unique root node of the tree representing the entire tree.
+    ///
+    /// You can think of this as taking the complete slice of the tree similar
+    /// to `&vec[..]` for a [Vec][std::vec::Vec] `vec`.
     pub fn root(&self) -> Node<'_, T> {
         Node {
             verts: &self.verts[..],
@@ -200,6 +203,69 @@ impl<'a, T> Node<'a, T> {
     /// Returns a reference to the payload of the node.
     pub fn data(&self) -> &T {
         &self.verts[0].data
+    }
+
+    /// Returns a depth first iterator of nodes. It iterates all nodes in the
+    /// subtree of the node, including the node itself.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// let mut sap = read_tree::Sapling::new();
+    /// sap.push(1).unwrap();
+    /// sap.push_leaf(11).unwrap();
+    /// sap.push(12).unwrap();
+    /// sap.push_leaf(121).unwrap();
+    /// sap.pop().unwrap();
+    /// sap.pop().unwrap();
+    /// let tree = sap.build().unwrap();
+    /// let mut iter = tree.root().iter();
+    ///
+    /// assert_eq!(iter.next().unwrap().data(), &1);
+    /// assert_eq!(iter.next().unwrap().data(), &11);
+    /// assert_eq!(iter.next().unwrap().data(), &12);
+    /// assert_eq!(iter.next().unwrap().data(), &121);
+    /// assert!(iter.next().is_none());
+    /// ```
+    pub fn iter(&self) -> Descendants<'a, T> {
+        Descendants { verts: self.verts }
+    }
+}
+
+/// A depth first iterator of nodes. It iterates all nodes in the subtree of the
+/// node, including the node itself.
+///
+/// # Example
+///
+/// ```rust
+/// let mut sap = read_tree::Sapling::new();
+/// sap.push(1).unwrap();
+/// sap.push_leaf(11).unwrap();
+/// sap.push(12).unwrap();
+/// sap.push_leaf(121).unwrap();
+/// sap.pop().unwrap();
+/// sap.pop().unwrap();
+/// let tree = sap.build().unwrap();
+/// let mut iter = tree.root().iter();
+///
+/// assert_eq!(iter.next().unwrap().data(), &1);
+/// assert_eq!(iter.next().unwrap().data(), &11);
+/// assert_eq!(iter.next().unwrap().data(), &12);
+/// assert_eq!(iter.next().unwrap().data(), &121);
+/// assert!(iter.next().is_none());
+/// ```
+#[derive(Debug)]
+pub struct Descendants<'a, T> {
+    verts: &'a [Vertex<T>],
+}
+
+impl<'a, T> Iterator for Descendants<'a, T> {
+    type Item = Node<'a, T>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let verts = &self.verts[0..self.verts.get(0)?.len + 1];
+        self.verts = &self.verts[1..];
+        Some(Node { verts })
     }
 }
 
