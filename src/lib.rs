@@ -35,32 +35,30 @@
 //! use read_tree::Sapling;
 //!
 //! let mut sap = Sapling::new();
-//! sap.push(1).unwrap();
-//! sap.pop().unwrap();
+//! sap.push(1);
+//! sap.pop();
 //!
 //! let tree = sap.build().unwrap();
 //! let root = tree.root();
 //!
-//! assert_eq!(*root.data(), 1);
+//! assert_eq!(root.data(), &1);
 //! ```
 
 #![deny(missing_docs)]
 
-/// An error enum returned by [Sapling][Sapling] for various mutating
-/// operations.
+/// An error enum returned when attempting to build a [Sapling][Sapling].
 #[derive(Debug)]
 pub enum Error {
-    /// Failed to add a new node to a sapling. Occurs when the root node has
-    /// already been closed and creating a new node would create a second root
-    /// in the sapling.
-    Push,
+    /// The sapling is incomplete and not ready to be built.
+    ///
+    /// It is either empty or there are still unfinished nodes.
+    Incomplete,
 
-    /// Failed to close the current node. Occurs when there is no selected node.
-    Pop,
-
-    /// Sapling is incomplete. Occurs when trying to build an incomplete
-    /// sapling.
-    NotComplete,
+    /// The sapling contains more than one root node.
+    ///
+    /// When creating nodes on a sapling it is possible to finish the root node
+    /// and add a second one. Trees however must have a unique root.
+    MultipleRoots,
 }
 
 #[derive(Debug)]
@@ -69,7 +67,7 @@ struct Vertex<T> {
     data: T,
 }
 
-/// A build struct to construct new [Tree][Tree]s.
+/// A build struct to construct a new [Tree][Tree].
 #[derive(Debug)]
 pub struct Sapling<T> {
     path: Vec<usize>,
@@ -88,56 +86,42 @@ impl<T> Sapling<T> {
         }
     }
 
-    /// Adds a new node carrying `data` to the sapling.
+    /// Adds a new node with the payload `data` to the sapling.
     ///
-    /// Selects the new node. Fails when no node is selected.
-    pub fn push(&mut self, data: T) -> Result<(), Error> {
-        if self.complete() {
-            return Err(Error::Push);
-        }
-
+    /// Selects the new node.
+    pub fn push(&mut self, data: T) {
         self.path.push(self.verts.len());
         self.verts.push(Vertex { len: 0, data });
-        Ok(())
     }
 
-    /// Adds a new node carrying `data` to the sapling.
+    /// Adds a new node with the payload `data` to the sapling.
     ///
-    /// Does not change selection. The new node will not have any children.
-    /// Fails when no node is selected.
-    pub fn push_leaf(&mut self, data: T) -> Result<(), Error> {
-        if self.complete() {
-            return Err(Error::Push);
-        }
-
+    /// Does not change selection.
+    pub fn push_leaf(&mut self, data: T) {
         self.verts.push(Vertex { len: 0, data });
-        Ok(())
     }
 
     /// Attaches another tree to the selected node.
     ///
-    /// Returns an empty sapling that is reusing the internal buffer of the
-    /// consumed tree.
-    pub fn push_tree(&mut self, other: Tree<T>) -> Result<Sapling<T>, Error> {
-        if self.complete() {
-            return Err(Error::Push);
-        }
-
+    /// Does not change selection. Returns an empty sapling that is reusing the
+    /// internal buffer of the consumed tree `other`.
+    pub fn push_tree(&mut self, other: Tree<T>) -> Sapling<T> {
         let mut verts = other.verts;
         self.verts.append(&mut verts);
-        Ok(Sapling {
+        Sapling {
             path: Vec::new(),
             verts,
-        })
+        }
     }
 
     /// Closes the selected node.
     ///
-    /// Selects the parent of the closed node. Fails when no node is selected.
-    pub fn pop(&mut self) -> Result<(), Error> {
-        let i = self.path.pop().ok_or(Error::Pop)?;
+    /// Selects the parent of the closed node. Returns `None` if there was no
+    /// node to close.
+    pub fn pop(&mut self) -> Option<()> {
+        let i = self.path.pop()?;
         self.verts[i].len = self.verts.len() - i - 1;
-        Ok(())
+        Some(())
     }
 
     /// Removes all nodes from the sapling, making it empty.
@@ -147,22 +131,28 @@ impl<T> Sapling<T> {
     }
 
     /// Returns `true` if the sapling has no nodes.
-    pub fn empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.verts.is_empty()
     }
 
     /// Return `true` if the sapling is ready to be built.
-    pub fn complete(&self) -> bool {
+    ///
+    /// Verifies that the sapling is not empty and has no open nodes. It does
+    /// not verify the number of root nodes of the sapling.
+    pub fn is_ready(&self) -> bool {
         self.path.is_empty() && !self.verts.is_empty()
     }
 
     /// Builds the sapling into a tree.
     ///
     /// Consumes the sapling in the process. Fails when the sapling is
-    /// incomplete.
-    pub fn build(self) -> Result<Tree<T>, Error> {
-        if !self.complete() {
-            return Err(Error::NotComplete);
+    /// incomplete or has multiple roots.
+    pub fn build(self) -> Result<Tree<T>, (Sapling<T>, Error)> {
+        if !self.is_ready() {
+            return Err((self, Error::Incomplete));
+        }
+        if self.verts[0].len < self.verts.len() - 1 {
+            return Err((self, Error::MultipleRoots));
         }
 
         Ok(Tree { verts: self.verts })
@@ -206,27 +196,8 @@ impl<'a, T> Node<'a, T> {
     }
 
     /// Returns a depth first iterator of nodes. It iterates all nodes in the
-    /// subtree of the node, including the node itself.
-    ///
-    /// # Example
-    ///
-    /// ```rust
-    /// let mut sap = read_tree::Sapling::new();
-    /// sap.push(1).unwrap();
-    /// sap.push_leaf(11).unwrap();
-    /// sap.push(12).unwrap();
-    /// sap.push_leaf(121).unwrap();
-    /// sap.pop().unwrap();
-    /// sap.pop().unwrap();
-    /// let tree = sap.build().unwrap();
-    /// let mut iter = tree.root().iter();
-    ///
-    /// assert_eq!(iter.next().unwrap().data(), &1);
-    /// assert_eq!(iter.next().unwrap().data(), &11);
-    /// assert_eq!(iter.next().unwrap().data(), &12);
-    /// assert_eq!(iter.next().unwrap().data(), &121);
-    /// assert!(iter.next().is_none());
-    /// ```
+    /// subtree of the node, including the node itself. See
+    /// [Descendants][Descendants] for more information.
     pub fn iter(&self) -> Descendants<'a, T> {
         Descendants { verts: self.verts }
     }
@@ -239,12 +210,12 @@ impl<'a, T> Node<'a, T> {
 ///
 /// ```rust
 /// let mut sap = read_tree::Sapling::new();
-/// sap.push(1).unwrap();
-/// sap.push_leaf(11).unwrap();
-/// sap.push(12).unwrap();
-/// sap.push_leaf(121).unwrap();
-/// sap.pop().unwrap();
-/// sap.pop().unwrap();
+/// sap.push(1);
+/// sap.push_leaf(11);
+/// sap.push(12);
+/// sap.push_leaf(121);
+/// sap.pop();
+/// sap.pop();
 /// let tree = sap.build().unwrap();
 /// let mut iter = tree.root().iter();
 ///
@@ -273,85 +244,77 @@ impl<'a, T> Iterator for Descendants<'a, T> {
 mod test_sapling {
     use super::*;
 
-    fn tiny() -> Result<Tree<usize>, Error> {
+    fn tiny() -> Tree<usize> {
         let mut sap = Sapling::new();
-        sap.push_leaf(1)?;
-        sap.build()
+        sap.push_leaf(1);
+        sap.build().unwrap()
     }
 
-    fn small() -> Result<Tree<usize>, Error> {
+    fn small() -> Tree<usize> {
         let mut sap = Sapling::new();
-        sap.push(1)?;
-        sap.push_leaf(11)?;
-        sap.push(12)?;
-        sap.push(121)?;
-        sap.push_leaf(1211)?;
-        sap.pop()?;
-        sap.push_leaf(122)?;
-        sap.pop()?;
-        sap.pop()?;
-        sap.build()
-    }
-
-    #[test]
-    fn test_tiny() -> Result<(), Error> {
-        tiny().map(|_| ())
+        sap.push(1);
+        sap.push_leaf(11);
+        sap.push(12);
+        sap.push(121);
+        sap.push_leaf(1211);
+        sap.pop();
+        sap.push_leaf(122);
+        sap.pop();
+        sap.pop();
+        sap.build().unwrap()
     }
 
     #[test]
-    fn test_small() -> Result<(), Error> {
-        small().map(|_| ())
+    fn test_tiny() {
+        tiny();
     }
 
     #[test]
-    fn test_err() -> Result<(), Error> {
-        let mut sap = Sapling::<usize>::new();
-        sap.pop().unwrap_err();
+    fn test_small() {
+        small();
+    }
 
-        let mut sap = Sapling::new();
-        sap.push_leaf(0)?;
-        sap.push_leaf(0).unwrap_err();
-
-        let mut sap = Sapling::new();
-        sap.push(0)?;
-        sap.pop()?;
-        sap.push(0).unwrap_err();
-
+    #[test]
+    fn test_err() {
         let sap = Sapling::<usize>::new();
         sap.build().unwrap_err();
 
+        let mut sap = Sapling::<usize>::new();
+        assert!(sap.pop().is_none());
+
         let mut sap = Sapling::new();
-        sap.push(0)?;
+        sap.push(0);
         sap.build().unwrap_err();
 
         let mut sap = Sapling::new();
-        sap.push(0)?;
-        sap.push(0)?;
-        sap.pop()?;
+        sap.push_leaf(0);
+        sap.push_leaf(0);
         sap.build().unwrap_err();
 
-        Ok(())
+        let mut sap = Sapling::new();
+        sap.push(0);
+        sap.push(0);
+        sap.pop();
+        sap.build().unwrap_err();
     }
 
     #[test]
-    fn test_clear() -> Result<(), Error> {
+    fn test_clear() {
         let mut sap = Sapling::new();
-        sap.push(0)?;
+        sap.push_leaf(0);
         sap.clear();
         sap.build().unwrap_err();
 
         let mut sap = Sapling::new();
-        sap.push(0)?;
+        sap.push(0);
         sap.clear();
-        sap.push_leaf(0)?;
-        sap.build()?;
+        sap.push_leaf(0);
+        sap.build().unwrap();
 
         let mut sap = Sapling::new();
-        sap.push_leaf(0)?;
+        sap.push_leaf(0);
         sap.clear();
-        sap.push_leaf(0)?;
-        sap.build()?;
-
-        Ok(())
+        sap.push_leaf(0);
+        sap.build().unwrap();
     }
 }
