@@ -176,3 +176,28 @@ impl<T> Sapling<T> {
 pub struct Tree<T> {
     verts: Vec<Vertex<T>>,
 }
+
+impl<T> Tree<T> {
+    /// Returns the root node of the tree.
+    pub fn root(&self) -> Node<'_, T> {
+        Node {
+            verts: &self.verts[..],
+        }
+    }
+}
+
+/// A slice of a [Tree][Tree].
+///
+/// A node is essentially the same as a tree, only that it does not own its
+/// data. You can navigate a node using iterators.
+#[derive(Debug)]
+pub struct Node<'a, T> {
+    verts: &'a [Vertex<T>],
+}
+
+impl<'a, T> Node<'a, T> {
+    /// Returns a reference to the payload of the node.
+    pub fn data(&self) -> &T {
+        &self.verts[0].data
+    }
+}
