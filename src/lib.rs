@@ -201,6 +201,14 @@ impl<'a, T> Node<'a, T> {
     pub fn iter(&self) -> Descendants<'a, T> {
         Descendants { verts: self.verts }
     }
+
+    /// Returns an iterator over the child nodes of the node. See
+    /// [Children][Children] for more information.
+    pub fn children(&self) -> Children<'a, T> {
+        Children {
+            verts: &self.verts[1..],
+        }
+    }
 }
 
 /// A depth first iterator of nodes. It iterates all nodes in the subtree of the
@@ -236,6 +244,40 @@ impl<'a, T> Iterator for Descendants<'a, T> {
     fn next(&mut self) -> Option<Self::Item> {
         let verts = &self.verts[0..self.verts.get(0)?.len + 1];
         self.verts = &self.verts[1..];
+        Some(Node { verts })
+    }
+}
+
+/// An iterator of child nodes.
+///
+/// # Example
+///
+/// ```rust
+/// let mut sap = read_tree::Sapling::new();
+/// sap.push(1);
+/// sap.push_leaf(11);
+/// sap.push(12);
+/// sap.push_leaf(121);
+/// sap.pop();
+/// sap.pop();
+/// let tree = sap.build().unwrap();
+/// let mut iter = tree.root().children();
+///
+/// assert_eq!(iter.next().unwrap().data(), &11);
+/// assert_eq!(iter.next().unwrap().data(), &12);
+/// assert!(iter.next().is_none());
+/// ```
+#[derive(Debug)]
+pub struct Children<'a, T> {
+    verts: &'a [Vertex<T>],
+}
+
+impl<'a, T> Iterator for Children<'a, T> {
+    type Item = Node<'a, T>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let (verts, remainder) = &self.verts.split_at(self.verts.get(0)?.len + 1);
+        self.verts = remainder;
         Some(Node { verts })
     }
 }
