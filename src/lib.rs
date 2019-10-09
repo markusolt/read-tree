@@ -34,13 +34,14 @@
 //! ```rust
 //! use read_tree::Sapling;
 //!
-//! let sap = Sapling::new();
+//! let mut sap = Sapling::new();
 //! sap.push(1).unwrap();
+//! sap.pop().unwrap();
 //!
 //! let tree = sap.build().unwrap();
 //! let root = tree.root();
 //!
-//! assert_eq!(root.data, 1);
+//! assert_eq!(*root.data(), 1);
 //! ```
 
 #![deny(missing_docs)]
@@ -199,5 +200,40 @@ impl<'a, T> Node<'a, T> {
     /// Returns a reference to the payload of the node.
     pub fn data(&self) -> &T {
         &self.verts[0].data
+    }
+}
+
+#[cfg(test)]
+mod test_sapling {
+    use super::*;
+
+    fn tiny() -> Result<Tree<usize>, Error> {
+        let mut sap = Sapling::new();
+        sap.push_leaf(1)?;
+        sap.build()
+    }
+
+    fn small() -> Result<Tree<usize>, Error> {
+        let mut sap = Sapling::new();
+        sap.push(1)?;
+        sap.push_leaf(11)?;
+        sap.push(12)?;
+        sap.push(121)?;
+        sap.push_leaf(1211)?;
+        sap.pop()?;
+        sap.push_leaf(122)?;
+        sap.pop()?;
+        sap.pop()?;
+        sap.build()
+    }
+
+    #[test]
+    fn test_tiny() -> Result<(), Error> {
+        tiny().map(|_| ())
+    }
+
+    #[test]
+    fn test_small() -> Result<(), Error> {
+        small().map(|_| ())
     }
 }
