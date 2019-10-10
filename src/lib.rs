@@ -20,14 +20,10 @@
 //! select its parent use `pop()`. When adding a node with no children
 //! `push_leaf(_)` can be used; it behaves the same as `push(_); pop();`.
 //!
-//! All changes to a sapling return a `Result`. This is done because the sapling
-//! ensures certain qualities of your tree. For instance it ensures there is
-//! exactly one root.
-//!
 //! When the sapling is complete you can use `build()` to turn the sapling into
 //! a [Tree][Tree]. The resulting tree can no longer be modified. Navigating
 //! trees is done by using slices of trees called [Node][Node]s. To get started
-//! use `root()` on a tree to get its root node.
+//! use `root()` on a tree to get its root node which covers the entire tree.
 //!
 //! Nodes support various iterators to navigate their contents.
 //!
@@ -56,11 +52,24 @@ pub enum Error {
 
     /// The sapling contains more than one root node.
     ///
-    /// When creating nodes on a sapling it is possible to finish the root node
-    /// and add a second one. Trees however must have a unique root.
+    /// When creating nodes on a sapling it is possible to `pop()` the rootnode
+    /// and `push(_)` a second one. Trees however must have a unique root. Use
+    /// `build_polytree()` to build a [PolyTree][PolyTree].
     MultipleRoots,
 }
 
+/// An internal struct that stores the payload and structure of a tree.
+///
+/// Every node on the tree is represented by a vertex. The `len` field stores
+/// the number of descendants the node has; this is the number of nodes in the
+/// subtree below the node. A leaf node has length `0`.
+///
+/// The field `depth` stores the nodes depth relative to the root of the tree or
+/// poly-tree. Root nodes have depth `0`. This information is redundant, but
+/// storing it allows us to perform certain iterations on nodes without
+/// allocating memory for a [Vec][std::vec::Vec]. The field is a trade-off that
+/// increases the memory footprint of trees, however avoids allocations during
+/// some iterations.
 #[derive(Debug)]
 struct Vertex<T> {
     len: usize,
@@ -68,7 +77,41 @@ struct Vertex<T> {
     data: T,
 }
 
-/// A build struct to construct a new [Tree][Tree].
+/// A builder to construct [Tree][Tree]s and [PolyTree][PolyTree]s.
+///
+/// Saplings are the only way of creating trees or poly-trees. New saplings are
+/// initialized empty, containing no nodes. Nodes are then added to the sapling
+/// until the tree is complete. The sapling can then be turned into a tree or a
+/// poly-tree.
+///
+/// Nodes are added to saplings using `.push(_)`. Adding a new node also selects
+/// it, meaning later calls of `push(_)` will attach the node as a child to this
+/// one. To close a node once all child nodes were added call `pop()`. When
+/// adding a node that should not have any child nodes, called leaf node, use
+/// `.push_leaf(_)`. This function acts the same as `.push(_); .pop();`.
+///
+/// When the sapling is complete turn it into a tree or a poly-tree using
+/// `.build()` or `.build_polytree()`. These functions return a `Result<_, _>`
+/// to indicate if the sapling was ready. To check if a sapling is ready to be
+/// built call `.is_ready()`.
+///
+/// # Example
+///
+/// ```rust
+/// let mut sap = read_tree::Sapling::new();
+///
+/// sap.push(1); // Add a new node to the tree carrying the payload `1`.
+/// sap.push_leaf(11); // Add a child node to node `1`. This node will have no children.
+///
+/// sap.push(12); // Add another child node to `1`.
+/// sap.push_leaf(121); // Add leaf nodes to node `12`.
+/// sap.push_leaf(122);
+///
+/// sap.pop(); // Close node `12`.
+/// sap.pop(); // Close node `1`.
+///
+/// let _tree = sap.build().unwrap();
+/// ```
 #[derive(Debug)]
 pub struct Sapling<T> {
     path: Vec<usize>,
@@ -78,8 +121,13 @@ pub struct Sapling<T> {
 impl<T> Sapling<T> {
     /// Creates a new empty sapling.
     ///
-    /// Saplings are used to create [Tree][Tree]s. Add nodes using `push(_)` and
-    /// `pop()`. Then `build()` the sapling into a tree.
+    /// An empty sapling is not yet ready to be built. Add at least one node
+    /// before building it into a tree.
+    ///
+    /// ```rust
+    /// let sap = read_tree::Sapling::<usize>::new();
+    /// sap.build().unwrap_err();
+    /// ```
     pub fn new() -> Self {
         Sapling {
             path: Vec::new(),
@@ -89,7 +137,12 @@ impl<T> Sapling<T> {
 
     /// Adds a new node with the payload `data` to the sapling.
     ///
-    /// Selects the new node.
+    /// Until `.pop()` is called new nodes will be attached to this new node. To
+    /// avoid changing the selected node use `push_leaf(_)` instead.
+    ///
+    /// Note that nodes have to be added to the sapling in the correct oder.
+    /// Once a node has been closed using `.pop()` its subtree is finalized and
+    /// can no longer be changed.
     pub fn push(&mut self, data: T) {
         self.path.push(self.verts.len());
         self.verts.push(Vertex {
@@ -99,9 +152,7 @@ impl<T> Sapling<T> {
         });
     }
 
-    /// Adds a new node with the payload `data` to the sapling.
-    ///
-    /// Does not change selection.
+    /// Adds a new leaf node with the payload `data` to the sapling.
     pub fn push_leaf(&mut self, data: T) {
         self.verts.push(Vertex {
             len: 0,
@@ -110,10 +161,33 @@ impl<T> Sapling<T> {
         });
     }
 
-    /// Closes the selected node.
+    /// Finalizes the current node.
     ///
-    /// Selects the parent of the closed node. Returns `None` if there was no
-    /// node to close.
+    /// The subtree under the current node is complete and will be sealed. From
+    /// now on new nodes will be attached to the parent of the finalized node.
+    ///
+    /// Returns `None` if no node is currently selected. This happens when the
+    /// sapling is empty or after a root node was finalized.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// let mut sap = read_tree::Sapling::new();
+    /// sap.push(0);
+    /// sap.pop();
+    /// sap.build().unwrap();
+    /// ```
+    ///
+    /// ```rust
+    /// let mut sap = read_tree::Sapling::<usize>::new();
+    /// assert!(sap.pop().is_none());
+    /// ```
+    ///
+    /// ```rust
+    /// let mut sap = read_tree::Sapling::new();
+    /// sap.push_leaf(0);
+    /// assert!(sap.pop().is_none());
+    /// ```
     pub fn pop(&mut self) -> Option<()> {
         let i = self.path.pop()?;
         self.verts[i].len = self.verts.len() - i - 1;
@@ -121,12 +195,24 @@ impl<T> Sapling<T> {
     }
 
     /// Removes all nodes from the sapling, making it empty.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// let mut sap = read_tree::Sapling::new();
+    /// sap.push_leaf(0);
+    /// assert_eq!(sap.is_empty(), false);
+    ///
+    /// sap.clear();
+    /// assert_eq!(sap.is_empty(), true);
+    /// ```
     pub fn clear(&mut self) {
         self.path.clear();
         self.verts.clear();
     }
 
-    /// Returns `true` if the sapling has no nodes.
+    /// Returns `true` if the sapling contains no nodes. Use `push(_)` to add
+    /// nodes.
     pub fn is_empty(&self) -> bool {
         self.verts.is_empty()
     }
@@ -134,7 +220,9 @@ impl<T> Sapling<T> {
     /// Return `true` if the sapling is ready to be built.
     ///
     /// Verifies that the sapling is not empty and has no open nodes. It does
-    /// not verify the number of root nodes of the sapling.
+    /// not verify the number of root nodes of the sapling. Building into a
+    /// [Tree][Tree] may still fail because trees do not allow multiple root
+    /// nodes.
     pub fn is_ready(&self) -> bool {
         self.path.is_empty() && !self.verts.is_empty()
     }
