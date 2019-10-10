@@ -64,6 +64,7 @@ pub enum Error {
 #[derive(Debug)]
 struct Vertex<T> {
     len: usize,
+    depth: usize,
     data: T,
 }
 
@@ -91,27 +92,22 @@ impl<T> Sapling<T> {
     /// Selects the new node.
     pub fn push(&mut self, data: T) {
         self.path.push(self.verts.len());
-        self.verts.push(Vertex { len: 0, data });
+        self.verts.push(Vertex {
+            len: 0,
+            depth: self.path.len() - 1,
+            data,
+        });
     }
 
     /// Adds a new node with the payload `data` to the sapling.
     ///
     /// Does not change selection.
     pub fn push_leaf(&mut self, data: T) {
-        self.verts.push(Vertex { len: 0, data });
-    }
-
-    /// Attaches another tree to the selected node.
-    ///
-    /// Does not change selection. Returns an empty sapling that is reusing the
-    /// internal buffer of the consumed tree `other`.
-    pub fn push_tree(&mut self, other: Tree<T>) -> Sapling<T> {
-        let mut verts = other.verts;
-        self.verts.append(&mut verts);
-        Sapling {
-            path: Vec::new(),
-            verts,
-        }
+        self.verts.push(Vertex {
+            len: 0,
+            depth: self.path.len(),
+            data,
+        });
     }
 
     /// Closes the selected node.
@@ -219,6 +215,11 @@ pub struct Node<'a, T> {
 }
 
 impl<'a, T> Node<'a, T> {
+    /// Returns the depth of the node within the tree.
+    pub fn depth(&self) -> usize {
+        self.verts[0].depth
+    }
+
     /// Returns a reference to the payload of the node.
     pub fn data(&self) -> &T {
         &self.verts[0].data
