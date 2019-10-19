@@ -63,17 +63,9 @@ pub enum Error {
 /// Every node on the tree is represented by a vertex. The `len` field stores
 /// the number of descendants the node has; this is the number of nodes in the
 /// subtree below the node. A leaf node has length `0`.
-///
-/// The field `depth` stores the nodes depth relative to the root of the tree or
-/// poly-tree. Root nodes have depth `0`. This information is redundant, but
-/// storing it allows us to perform certain iterations on nodes without
-/// allocating memory for a [Vec][std::vec::Vec]. The field is a trade-off that
-/// increases the memory footprint of trees, however avoids allocations during
-/// some iterations.
 #[derive(Debug)]
 struct Vertex<T> {
     len: usize,
-    depth: usize,
     data: T,
 }
 
@@ -145,20 +137,12 @@ impl<T> Sapling<T> {
     /// can no longer be changed.
     pub fn push(&mut self, data: T) {
         self.path.push(self.verts.len());
-        self.verts.push(Vertex {
-            len: 0,
-            depth: self.path.len() - 1,
-            data,
-        });
+        self.verts.push(Vertex { len: 0, data });
     }
 
     /// Adds a new leaf node with the payload `data` to the sapling.
     pub fn push_leaf(&mut self, data: T) {
-        self.verts.push(Vertex {
-            len: 0,
-            depth: self.path.len(),
-            data,
-        });
+        self.verts.push(Vertex { len: 0, data });
     }
 
     /// Finalizes the current node.
@@ -271,6 +255,7 @@ impl<T> Tree<T> {
     /// to `&vec[..]` for a [Vec][std::vec::Vec] `vec`.
     pub fn root(&self) -> Node<'_, T> {
         Node {
+            depth: 0,
             verts: &self.verts[..],
         }
     }
@@ -288,6 +273,7 @@ impl<T> PolyTree<T> {
     /// Returns an iterator over the root nodes of the poly-tree.
     pub fn roots(&self) -> Children<'_, T> {
         Children {
+            child_depth: 0,
             verts: &self.verts[..],
         }
     }
@@ -299,13 +285,14 @@ impl<T> PolyTree<T> {
 /// data. You can navigate a node using iterators.
 #[derive(Debug)]
 pub struct Node<'a, T> {
+    depth: usize,
     verts: &'a [Vertex<T>],
 }
 
 impl<'a, T> Node<'a, T> {
     /// Returns the depth of the node within the tree.
     pub fn depth(&self) -> usize {
-        self.verts[0].depth
+        self.depth
     }
 
     /// Returns a reference to the payload of the node.
@@ -317,13 +304,18 @@ impl<'a, T> Node<'a, T> {
     /// subtree of the node, including the node itself. See
     /// [Descendants][Descendants] for more information.
     pub fn iter(&self) -> Descendants<'a, T> {
-        Descendants { verts: self.verts }
+        Descendants {
+            depth: self.depth,
+            verts: self.verts,
+            pos: 0,
+        }
     }
 
     /// Returns an iterator over the child nodes of the node. See
     /// [Children][Children] for more information.
     pub fn children(&self) -> Children<'a, T> {
         Children {
+            child_depth: self.depth + 1,
             verts: &self.verts[1..],
         }
     }
@@ -353,16 +345,31 @@ impl<'a, T> Node<'a, T> {
 /// ```
 #[derive(Debug)]
 pub struct Descendants<'a, T> {
+    depth: usize,
     verts: &'a [Vertex<T>],
+    pos: usize,
 }
 
 impl<'a, T> Iterator for Descendants<'a, T> {
     type Item = Node<'a, T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let verts = &self.verts[0..self.verts.get(0)?.len + 1];
-        self.verts = &self.verts[1..];
-        Some(Node { verts })
+        let mut depth = self.depth;
+        let mut i = 0;
+        while i < self.pos {
+            let len = self.verts[i].len;
+            if i + len < self.pos {
+                i += len + 1;
+            } else {
+                depth += 1;
+                i += 1;
+            }
+        }
+
+        let verts = &self.verts[self.pos..self.pos + self.verts.get(self.pos)?.len + 1];
+        self.pos += 1;
+
+        Some(Node { depth, verts })
     }
 }
 
@@ -387,6 +394,7 @@ impl<'a, T> Iterator for Descendants<'a, T> {
 /// ```
 #[derive(Debug)]
 pub struct Children<'a, T> {
+    child_depth: usize,
     verts: &'a [Vertex<T>],
 }
 
@@ -396,7 +404,10 @@ impl<'a, T> Iterator for Children<'a, T> {
     fn next(&mut self) -> Option<Self::Item> {
         let (verts, remainder) = &self.verts.split_at(self.verts.get(0)?.len + 1);
         self.verts = remainder;
-        Some(Node { verts })
+        Some(Node {
+            depth: self.child_depth,
+            verts,
+        })
     }
 }
 
@@ -476,5 +487,53 @@ mod test_sapling {
         sap.clear();
         sap.push_leaf(0);
         sap.build().unwrap();
+    }
+
+    #[test]
+    fn test_iter_children() {
+        let tree = small();
+        let mut iter = tree.root().children();
+
+        let node = iter.next().unwrap();
+        assert_eq!(node.depth(), 1);
+        assert_eq!(node.data(), &11);
+
+        let node = iter.next().unwrap();
+        assert_eq!(node.depth(), 1);
+        assert_eq!(node.data(), &12);
+
+        assert!(iter.next().is_none());
+    }
+
+    #[test]
+    fn test_iter_descendants() {
+        let tree = small();
+        let mut iter = tree.root().iter();
+
+        let node = iter.next().unwrap();
+        assert_eq!(node.depth(), 0);
+        assert_eq!(node.data(), &1);
+
+        let node = iter.next().unwrap();
+        assert_eq!(node.depth(), 1);
+        assert_eq!(node.data(), &11);
+
+        let node = iter.next().unwrap();
+        assert_eq!(node.depth(), 1);
+        assert_eq!(node.data(), &12);
+
+        let node = iter.next().unwrap();
+        assert_eq!(node.depth(), 2);
+        assert_eq!(node.data(), &121);
+
+        let node = iter.next().unwrap();
+        assert_eq!(node.depth(), 3);
+        assert_eq!(node.data(), &1211);
+
+        let node = iter.next().unwrap();
+        assert_eq!(node.depth(), 2);
+        assert_eq!(node.data(), &122);
+
+        assert!(iter.next().is_none());
     }
 }
