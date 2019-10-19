@@ -223,7 +223,10 @@ impl<T> Sapling<T> {
             return Err((self, Error::MultipleRoots));
         }
 
-        Ok(Tree { verts: self.verts })
+        Ok(Tree {
+            path: self.path,
+            verts: self.verts,
+        })
     }
 
     /// Builds the sapling into a tree with multiple root nodes.
@@ -235,16 +238,20 @@ impl<T> Sapling<T> {
             return Err((self, Error::Incomplete));
         }
 
-        Ok(PolyTree { verts: self.verts })
+        Ok(PolyTree {
+            path: self.path,
+            verts: self.verts,
+        })
     }
 }
 
 /// A read-only tree data structure.
 ///
-/// Trees a created by [Sapling][Sapling]s. Most interactions with trees happen
-/// on slices of them called [Node][Node]s.
+/// Trees are created by [Sapling][Sapling]s. Most interactions with trees
+/// happen on slices of them called [Node][Node]s.
 #[derive(Debug)]
 pub struct Tree<T> {
+    path: Vec<usize>,
     verts: Vec<Vertex<T>>,
 }
 
@@ -259,6 +266,15 @@ impl<T> Tree<T> {
             verts: &self.verts[..],
         }
     }
+
+    /// Turns the tree back into a `Sapling`. No nodes are removed from the
+    /// tree; building the returned sapling will result in an equivalent tree.
+    pub fn into_sapling(self) -> Sapling<T> {
+        Sapling {
+            path: self.path,
+            verts: self.verts,
+        }
+    }
 }
 
 /// A read-only tree data structure with multiple root nodes.
@@ -266,6 +282,7 @@ impl<T> Tree<T> {
 /// Similar to [Tree][Tree], but does not necessarily have a unique root node.
 #[derive(Debug)]
 pub struct PolyTree<T> {
+    path: Vec<usize>,
     verts: Vec<Vertex<T>>,
 }
 
@@ -275,6 +292,16 @@ impl<T> PolyTree<T> {
         Children {
             child_depth: 0,
             verts: &self.verts[..],
+        }
+    }
+
+    /// Turns the poly-tree back into a `Sapling`. No nodes are removed from the
+    /// tree; building the returned sapling will result in an equivalent
+    /// poly-tree.
+    pub fn into_sapling(self) -> Sapling<T> {
+        Sapling {
+            path: self.path,
+            verts: self.verts,
         }
     }
 }
