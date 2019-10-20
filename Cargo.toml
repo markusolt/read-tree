@@ -7,7 +7,7 @@ authors = ["Markus <markus@blaumond.net>"]
 license = "MIT"
 edition = "2018"
 
-documentation = ""
+documentation = "https://docs.rs/read-tree"
 homepage = "https://github.com/markusolt/read-tree"
 repository = "https://github.com/markusolt/read-tree"
 
