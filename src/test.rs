@@ -78,14 +78,14 @@ mod test_sapling {
     }
 }
 
-mod test_tree {
+mod test_node {
     use super::*;
 
     #[test]
-    fn test_from() {
-        let tree = small();
-        let tree_2 = Tree::from(tree.root());
-        for (n1, n2) in tree.root().iter().zip(tree_2.root().iter()) {
+    fn test_to_tree() {
+        let tree_1 = small();
+        let tree_2 = tree_1.root().into_tree();
+        for (n1, n2) in tree_1.root().iter().zip(tree_2.root().iter()) {
             assert_eq!(n1.data(), n2.data());
         }
     }

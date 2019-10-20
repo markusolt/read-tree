@@ -23,7 +23,7 @@ pub enum Error {
 /// Every node on the tree is represented by a vertex. The `len` field stores
 /// the number of descendants the node has; this is the number of nodes in the
 /// subtree below the node. A leaf node has length `0`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 struct Vertex<T> {
     len: usize,
     data: T,
@@ -124,6 +124,17 @@ impl<T> Sapling<T> {
         self.verts.push(Vertex { len: 0, data });
     }
 
+    /// Adds another tree to the selected node in the sapling. Does not change
+    /// the selected node, similar to `.push_leaf(_)`.
+    ///
+    /// Empties `tree` in the process and returns it as an empty sapling.
+    pub fn push_tree(&mut self, tree: Tree<T>) -> Sapling<T> {
+        let mut sap = tree.into_sapling();
+        self.verts.append(&mut sap.verts);
+        sap.clear();
+        sap
+    }
+
     /// Closes the current node.
     ///
     /// The subtree under the current node is complete and will be closed. From
@@ -211,6 +222,17 @@ impl<T> Sapling<T> {
     }
 }
 
+impl<T: Clone> Sapling<T> {
+    /// Clones the contents of a node and attaches the cloned subtree to the
+    /// sapling.
+    ///
+    /// This is a relatively expensive step. The tree that `node` references is
+    /// unaffected.
+    pub fn push_node(&mut self, node: Node<T>) {
+        self.verts.extend_from_slice(node.verts);
+    }
+}
+
 /// A read-only tree data structure.
 ///
 /// Trees are created by [Sapling][Sapling]s. Most interactions with trees
@@ -249,21 +271,6 @@ impl<T> Tree<T> {
     }
 }
 
-impl<T: Clone> Tree<T> {
-    /// Creates a new tree from a node.
-    ///
-    /// The payloads of the nodes are cloned into the new tree. This is a
-    /// relatively expensive step.
-    pub fn from(node: Node<T>) -> Self {
-        let mut verts = Vec::new();
-        verts.extend_from_slice(node.verts);
-        Tree {
-            path: Vec::new(),
-            verts,
-        }
-    }
-}
-
 /// A slice of a [Tree][Tree].
 ///
 /// A node is essentially the same as a tree, only that it does not own its
@@ -280,17 +287,17 @@ impl<'a, T> Node<'a, T> {
         &self.verts[0].data
     }
 
+    /// Returns the depth of the node within the tree. The root node returns
+    /// depth `0`.
+    pub fn depth(&self) -> usize {
+        self.depth
+    }
+
     /// Returns the number of nodes within the subtree of this node.
     ///
     /// The count includes the node itself; a leaf node returns length `1`.
     pub fn len(&self) -> usize {
         self.verts.len()
-    }
-
-    /// Returns the depth of the node within the tree. The root node returns
-    /// depth `0`.
-    pub fn depth(&self) -> usize {
-        self.depth
     }
 
     /// Returns `true` if the node has no child nodes.
@@ -315,6 +322,21 @@ impl<'a, T> Node<'a, T> {
         Children {
             child_depth: self.depth + 1,
             verts: &self.verts[1..],
+        }
+    }
+}
+
+impl<'a, T: Clone> Node<'a, T> {
+    /// Clones the subtree of the node into a new tree.
+    ///
+    /// This step may be expensive and should be avoided if possible.
+    pub fn into_tree(self) -> Tree<T> {
+        let mut verts = Vec::new();
+        verts.extend_from_slice(self.verts);
+
+        Tree {
+            path: Vec::new(),
+            verts,
         }
     }
 }
