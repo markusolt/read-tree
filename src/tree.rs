@@ -3,7 +3,7 @@
 #![deny(missing_docs)]
 
 /// An error enum returned when attempting to build a [Sapling][Sapling].
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Error {
     /// The sapling is incomplete and not ready to be built.
     ///
@@ -135,6 +135,29 @@ impl<T> Sapling<T> {
         sap
     }
 
+    /// Returns a reference to the payload of the selected node. Returns `None`
+    /// if no node is currently selected; this happens when the sapling is empty
+    /// or after a root node was closed.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// let mut sap = read_tree::Sapling::new();
+    /// sap.push(0);
+    /// sap.push(1);
+    ///
+    /// assert_eq!(sap.pop(), Some(&1));
+    ///
+    /// assert_eq!(sap.peek(), Some(&0));
+    /// assert_eq!(sap.pop(), Some(&0));
+    ///
+    /// sap.build().unwrap();
+    /// ```
+    pub fn peek(&self) -> Option<&T> {
+        let i = *self.path.last()?;
+        Some(&self.verts[i].data)
+    }
+
     /// Closes the current node.
     ///
     /// The subtree under the current node is complete and will be closed. From
@@ -149,24 +172,88 @@ impl<T> Sapling<T> {
     /// ```rust
     /// let mut sap = read_tree::Sapling::new();
     /// sap.push(0);
-    /// sap.pop();
+    /// assert_eq!(sap.pop(), Some(&0));
     /// sap.build().unwrap();
     /// ```
     ///
     /// ```rust
     /// let mut sap = read_tree::Sapling::<usize>::new();
-    /// assert!(sap.pop().is_none());
+    /// assert_eq!(sap.pop(), None);
     /// ```
     ///
     /// ```rust
     /// let mut sap = read_tree::Sapling::new();
     /// sap.push_leaf(0);
-    /// assert!(sap.pop().is_none());
+    /// assert_eq!(sap.pop(), None);
     /// ```
     pub fn pop(&mut self) -> Option<&T> {
         let i = self.path.pop()?;
         self.verts[i].len = self.verts.len() - i - 1;
         Some(&self.verts[i].data)
+    }
+
+    /// Closes all open nodes.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// let mut sap = read_tree::Sapling::new();
+    /// sap.push(0);
+    /// sap.push(1);
+    /// sap.push(2);
+    /// sap.pop_all();
+    ///
+    /// let _tree = sap.build().unwrap();
+    /// ```
+    pub fn pop_all(&mut self) {
+        while let Some(i) = self.path.pop() {
+            self.verts[i].len = self.verts.len() - i - 1;
+        }
+    }
+
+    /// Closes the current node and makes it a leaf node.
+    ///
+    /// Any nodes that were attached to the current node will be attached to its
+    /// parent node instead.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// let mut sap = read_tree::Sapling::new();
+    /// sap.push(0);
+    /// sap.push(1);
+    /// sap.push_leaf(2);
+    ///
+    /// // make `1` a leaf node; changing `2` to be a child of `0`
+    /// sap.pop_as_leaf();
+    /// sap.pop();
+    /// let tree = sap.build().unwrap();
+    /// let mut iter = tree.root().children();
+    ///
+    /// assert_eq!(iter.next().unwrap().data(), &1);
+    /// assert_eq!(iter.next().unwrap().data(), &2);
+    /// ```
+    pub fn pop_as_leaf(&mut self) -> Option<&T> {
+        let i = self.path.pop()?;
+        Some(&self.verts[i].data)
+    }
+
+    /// Closes all open nodes and makes them all leaf nodes.
+    ///
+    /// If there are open nodes in the sapling, this will cause multiple root
+    /// nodes.
+    ///
+    /// # Example
+    ///
+    /// ```rust
+    /// let mut sap = read_tree::Sapling::new();
+    /// sap.push(0);
+    /// sap.push(1);
+    /// sap.pop_as_leaf_all();
+    /// assert_eq!(sap.build().unwrap_err().1, read_tree::Error::MultipleRoots);
+    /// ```
+    pub fn pop_as_leaf_all(&mut self) {
+        self.path.clear();
     }
 
     /// Removes all nodes from the sapling, making it empty.
