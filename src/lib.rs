@@ -1,5 +1,5 @@
 //! This crate provides a library for creating and then reading trees. The trees
-//! cannot be modified after creation.
+//! cannot be modified after their creation.
 //!
 //! # Usage
 //!
@@ -15,15 +15,16 @@
 //! # Example
 //!
 //! Trees are created using the builder struct [Sapling][Sapling]. Nodes can be
-//! attached to a sapling by using `push(_)`. When a node is added to a sapling
+//! attached to a sapling by using `.push(_)`. When a node is added to a sapling
 //! it is also selected as the parent for later nodes. To finish a node and
-//! select its parent use `pop()`. When adding a node with no children
-//! `push_leaf(_)` can be used; it behaves the same as `push(_); pop();`.
+//! reselect its parent use `.pop()`. When adding a node with no children use
+//! `.push_leaf(_)`; it behaves the same as `.push(_); .pop();`.
 //!
-//! When the sapling is complete you can use `build()` to turn the sapling into
-//! a [Tree][Tree]. The resulting tree can no longer be modified. Navigating
-//! trees is done by using slices of trees called [Node][Node]s. To get started
-//! use `root()` on a tree to get its root node which covers the entire tree.
+//! When the sapling is complete, you can use `.build()` to turn the sapling
+//! into a [Tree][Tree]. The resulting tree can no longer be modified.
+//! Navigating trees is done by using slices of trees called [Node][Node]s. To
+//! get started use `.root()` on a tree to get its root node which contains the
+//! entire tree.
 //!
 //! Nodes support various iterators to navigate their contents.
 //!
@@ -42,4 +43,7 @@
 
 mod tree;
 
-pub use tree::{Children, Descendants, Error, Node, PolyTree, Sapling, Tree};
+#[cfg(test)]
+mod test;
+
+pub use tree::{Children, Descendants, Error, Node, Sapling, Tree};

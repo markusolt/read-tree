@@ -12,56 +12,56 @@ pub enum Error {
 
     /// The sapling contains more than one root node.
     ///
-    /// When creating nodes on a sapling it is possible to `pop()` the rootnode
-    /// and `push(_)` a second one. Trees however must have a unique root. Use
-    /// `build_polytree()` to build a [PolyTree][PolyTree].
+    /// When creating nodes on a sapling it is possible to `pop()` the root node
+    /// and `push(_)` a second root. Trees however must have a unique root.
     MultipleRoots,
 }
 
-/// An internal struct that stores the payload and structure of a tree.
+/// An internal struct that stores the payload and relationships of a node on a
+/// tree.
 ///
 /// Every node on the tree is represented by a vertex. The `len` field stores
 /// the number of descendants the node has; this is the number of nodes in the
 /// subtree below the node. A leaf node has length `0`.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct Vertex<T> {
     len: usize,
     data: T,
 }
 
-/// A builder to construct [Tree][Tree]s and [PolyTree][PolyTree]s.
+/// A builder to construct [Tree][Tree]s.
 ///
-/// Saplings are the only way of creating trees or poly-trees. New saplings are
-/// initialized empty, containing no nodes. Nodes are then added to the sapling
-/// until the tree is complete. The sapling can then be turned into a tree or a
-/// poly-tree.
+/// Saplings are the only way of creating trees. New saplings are initialized
+/// empty, containing no nodes. Nodes are then added to the sapling until the
+/// tree is complete. The sapling can then be turned into a tree.
 ///
 /// Nodes are added to saplings using `.push(_)`. Adding a new node also selects
-/// it, meaning later calls of `push(_)` will attach the node as a child to this
-/// one. To close a node once all child nodes were added call `pop()`. When
-/// adding a node that should not have any child nodes, called leaf node, use
-/// `.push_leaf(_)`. This function acts the same as `.push(_); .pop();`.
+/// it, meaning later calls of `.push(_)` will attach the new node as a child to
+/// this one. To close a node once all its child nodes have been added, call
+/// `.pop()`. When adding a node that will not have any child nodes, use
+/// `.push_leaf(_)`; this acts the same as `.push(_); .pop();`.
 ///
-/// When the sapling is complete turn it into a tree or a poly-tree using
-/// `.build()` or `.build_polytree()`. These functions return a `Result<_, _>`
-/// to indicate if the sapling was ready. To check if a sapling is ready to be
-/// built call `.is_ready()`.
+/// When the sapling is complete, turn it into a tree using `.build()`. This
+/// function returns a `Result<_, _>` to indicate if the sapling was built
+/// successfully. To check if a sapling is ready to be built call `.is_ready()`.
 ///
 /// # Example
 ///
 /// ```rust
 /// let mut sap = read_tree::Sapling::new();
+/// assert!(sap.is_empty());
 ///
 /// sap.push(1); // Add a new node to the tree carrying the payload `1`.
 /// sap.push_leaf(11); // Add a child node to node `1`. This node will have no children.
 ///
-/// sap.push(12); // Add another child node to `1`.
+/// sap.push(12); // Add another child node to `1`. Select this node.
 /// sap.push_leaf(121); // Add leaf nodes to node `12`.
 /// sap.push_leaf(122);
 ///
 /// sap.pop(); // Close node `12`.
 /// sap.pop(); // Close node `1`.
 ///
+/// assert!(sap.is_ready());
 /// let _tree = sap.build().unwrap();
 /// ```
 #[derive(Debug)]
@@ -78,7 +78,8 @@ impl<T> Sapling<T> {
     ///
     /// ```rust
     /// let sap = read_tree::Sapling::<usize>::new();
-    /// sap.build().unwrap_err();
+    /// assert!(sap.is_empty());
+    /// assert!(sap.build().is_err());
     /// ```
     pub fn new() -> Self {
         Sapling {
@@ -87,10 +88,28 @@ impl<T> Sapling<T> {
         }
     }
 
+    /// Creates a new empty sapling with enough capacity to store `len` many
+    /// nodes.
+    ///
+    /// The sapling is allowed to receive more than `len` nodes; this may
+    /// however cause additional allocations.
+    ///
+    /// The optional parameter `depth` should predict the maximum depth of the
+    /// tree. If the depth is unknown use `None`. The depth should include the
+    /// root node, can however exclude leaf nodes, if the leaf nodes will be
+    /// added using `.push_leaf(_)`. Essentially every call to `push(_)`
+    /// increases the depth, and every call to `pop()` decreases it.
+    pub fn with_capacity(len: usize, depth: Option<usize>) -> Self {
+        Sapling {
+            path: Vec::with_capacity(depth.unwrap_or(0)),
+            verts: Vec::with_capacity(len),
+        }
+    }
+
     /// Adds a new node with the payload `data` to the sapling.
     ///
     /// Until `.pop()` is called new nodes will be attached to this new node. To
-    /// avoid changing the selected node use `push_leaf(_)` instead.
+    /// avoid changing the selected node use `.push_leaf(_)` instead.
     ///
     /// Note that nodes have to be added to the sapling in the correct oder.
     /// Once a node has been closed using `.pop()` its subtree is finalized and
@@ -105,13 +124,14 @@ impl<T> Sapling<T> {
         self.verts.push(Vertex { len: 0, data });
     }
 
-    /// Finalizes the current node.
+    /// Closes the current node.
     ///
-    /// The subtree under the current node is complete and will be sealed. From
-    /// now on new nodes will be attached to the parent of the finalized node.
+    /// The subtree under the current node is complete and will be closed. From
+    /// now on new nodes will be attached to the parent of the closed node.
     ///
-    /// Returns `None` if no node is currently selected. This happens when the
-    /// sapling is empty or after a root node was finalized.
+    /// Returns a reference to the payload of the closed node. Returns `None` if
+    /// no node is currently selected; this happens when the sapling is empty or
+    /// after a root node was closed.
     ///
     /// # Examples
     ///
@@ -132,10 +152,10 @@ impl<T> Sapling<T> {
     /// sap.push_leaf(0);
     /// assert!(sap.pop().is_none());
     /// ```
-    pub fn pop(&mut self) -> Option<()> {
+    pub fn pop(&mut self) -> Option<&T> {
         let i = self.path.pop()?;
         self.verts[i].len = self.verts.len() - i - 1;
-        Some(())
+        Some(&self.verts[i].data)
     }
 
     /// Removes all nodes from the sapling, making it empty.
@@ -174,7 +194,8 @@ impl<T> Sapling<T> {
     /// Builds the sapling into a tree.
     ///
     /// Consumes the sapling in the process. Fails when the sapling is
-    /// incomplete or has multiple roots.
+    /// incomplete or has multiple roots. When failing to build the sapling, the
+    /// sapling is returned unmodified with the error.
     pub fn build(self) -> Result<Tree<T>, (Sapling<T>, Error)> {
         if !self.is_ready() {
             return Err((self, Error::Incomplete));
@@ -188,27 +209,13 @@ impl<T> Sapling<T> {
             verts: self.verts,
         })
     }
-
-    /// Builds the sapling into a tree with multiple root nodes.
-    ///
-    /// Consumes the sapling in the process. Fails when the sapling is
-    /// incomplete.
-    pub fn build_polytree(self) -> Result<PolyTree<T>, (Sapling<T>, Error)> {
-        if !self.is_ready() {
-            return Err((self, Error::Incomplete));
-        }
-
-        Ok(PolyTree {
-            path: self.path,
-            verts: self.verts,
-        })
-    }
 }
 
 /// A read-only tree data structure.
 ///
 /// Trees are created by [Sapling][Sapling]s. Most interactions with trees
-/// happen on slices of them called [Node][Node]s.
+/// happen on slices of them called [Node][Node]s. Get a node representing the
+/// entire tree using `.root()`.
 #[derive(Debug)]
 pub struct Tree<T> {
     path: Vec<usize>,
@@ -219,7 +226,7 @@ impl<T> Tree<T> {
     /// Returns the unique root node of the tree representing the entire tree.
     ///
     /// You can think of this as taking the complete slice of the tree similar
-    /// to `&vec[..]` for a [Vec][std::vec::Vec] `vec`.
+    /// to `&vec[..]` for a [Vec][std::vec::Vec].
     pub fn root(&self) -> Node<'_, T> {
         Node {
             depth: 0,
@@ -227,7 +234,12 @@ impl<T> Tree<T> {
         }
     }
 
-    /// Turns the tree back into a `Sapling`. No nodes are removed from the
+    /// Returns the number of nodes in the tree.
+    pub fn len(&self) -> usize {
+        self.verts.len()
+    }
+
+    /// Turns the tree back into a sapling. No nodes are removed from the
     /// tree; building the returned sapling will result in an equivalent tree.
     pub fn into_sapling(self) -> Sapling<T> {
         Sapling {
@@ -237,31 +249,17 @@ impl<T> Tree<T> {
     }
 }
 
-/// A read-only tree data structure with multiple root nodes.
-///
-/// Similar to [Tree][Tree], but does not necessarily have a unique root node.
-#[derive(Debug)]
-pub struct PolyTree<T> {
-    path: Vec<usize>,
-    verts: Vec<Vertex<T>>,
-}
-
-impl<T> PolyTree<T> {
-    /// Returns an iterator over the root nodes of the poly-tree.
-    pub fn roots(&self) -> Children<'_, T> {
-        Children {
-            child_depth: 0,
-            verts: &self.verts[..],
-        }
-    }
-
-    /// Turns the poly-tree back into a `Sapling`. No nodes are removed from the
-    /// tree; building the returned sapling will result in an equivalent
-    /// poly-tree.
-    pub fn into_sapling(self) -> Sapling<T> {
-        Sapling {
-            path: self.path,
-            verts: self.verts,
+impl<T: Clone> Tree<T> {
+    /// Creates a new tree from a node.
+    ///
+    /// The payloads of the nodes are cloned into the new tree. This is a
+    /// relatively expensive step.
+    pub fn from(node: Node<T>) -> Self {
+        let mut verts = Vec::new();
+        verts.extend_from_slice(node.verts);
+        Tree {
+            path: Vec::new(),
+            verts,
         }
     }
 }
@@ -277,14 +275,27 @@ pub struct Node<'a, T> {
 }
 
 impl<'a, T> Node<'a, T> {
-    /// Returns the depth of the node within the tree.
+    /// Returns a reference to the payload of the node.
+    pub fn data(&self) -> &T {
+        &self.verts[0].data
+    }
+
+    /// Returns the number of nodes within the subtree of this node.
+    ///
+    /// The count includes the node itself; a leaf node returns length `1`.
+    pub fn len(&self) -> usize {
+        self.verts.len()
+    }
+
+    /// Returns the depth of the node within the tree. The root node returns
+    /// depth `0`.
     pub fn depth(&self) -> usize {
         self.depth
     }
 
-    /// Returns a reference to the payload of the node.
-    pub fn data(&self) -> &T {
-        &self.verts[0].data
+    /// Returns `true` if the node has no child nodes.
+    pub fn is_leaf(&self) -> bool {
+        self.verts.len() == 1
     }
 
     /// Returns a depth first iterator of nodes. It iterates all nodes in the
@@ -341,6 +352,8 @@ impl<'a, T> Iterator for Descendants<'a, T> {
     type Item = Node<'a, T>;
 
     fn next(&mut self) -> Option<Self::Item> {
+        let verts = &self.verts[self.pos..self.pos + self.verts.get(self.pos)?.len + 1];
+
         let mut depth = self.depth;
         let mut i = 0;
         while i < self.pos {
@@ -353,10 +366,16 @@ impl<'a, T> Iterator for Descendants<'a, T> {
             }
         }
 
-        let verts = &self.verts[self.pos..self.pos + self.verts.get(self.pos)?.len + 1];
         self.pos += 1;
-
         Some(Node { depth, verts })
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self.verts.len(), Some(self.verts.len()))
+    }
+
+    fn count(self) -> usize {
+        self.verts.len()
     }
 }
 
@@ -396,131 +415,12 @@ impl<'a, T> Iterator for Children<'a, T> {
             verts,
         })
     }
-}
 
-#[cfg(test)]
-mod test_sapling {
-    use super::*;
-
-    fn tiny() -> Tree<usize> {
-        let mut sap = Sapling::new();
-        sap.push_leaf(1);
-        sap.build().unwrap()
-    }
-
-    fn small() -> Tree<usize> {
-        let mut sap = Sapling::new();
-        sap.push(1);
-        sap.push_leaf(11);
-        sap.push(12);
-        sap.push(121);
-        sap.push_leaf(1211);
-        sap.pop();
-        sap.push_leaf(122);
-        sap.pop();
-        sap.pop();
-        sap.build().unwrap()
-    }
-
-    #[test]
-    fn test_tiny() {
-        tiny();
-    }
-
-    #[test]
-    fn test_small() {
-        small();
-    }
-
-    #[test]
-    fn test_err() {
-        let sap = Sapling::<usize>::new();
-        sap.build().unwrap_err();
-
-        let mut sap = Sapling::<usize>::new();
-        assert!(sap.pop().is_none());
-
-        let mut sap = Sapling::new();
-        sap.push(0);
-        sap.build().unwrap_err();
-
-        let mut sap = Sapling::new();
-        sap.push_leaf(0);
-        sap.push_leaf(0);
-        sap.build().unwrap_err();
-
-        let mut sap = Sapling::new();
-        sap.push(0);
-        sap.push(0);
-        sap.pop();
-        sap.build().unwrap_err();
-    }
-
-    #[test]
-    fn test_clear() {
-        let mut sap = Sapling::new();
-        sap.push_leaf(0);
-        sap.clear();
-        sap.build().unwrap_err();
-
-        let mut sap = Sapling::new();
-        sap.push(0);
-        sap.clear();
-        sap.push_leaf(0);
-        sap.build().unwrap();
-
-        let mut sap = Sapling::new();
-        sap.push_leaf(0);
-        sap.clear();
-        sap.push_leaf(0);
-        sap.build().unwrap();
-    }
-
-    #[test]
-    fn test_iter_children() {
-        let tree = small();
-        let mut iter = tree.root().children();
-
-        let node = iter.next().unwrap();
-        assert_eq!(node.depth(), 1);
-        assert_eq!(node.data(), &11);
-
-        let node = iter.next().unwrap();
-        assert_eq!(node.depth(), 1);
-        assert_eq!(node.data(), &12);
-
-        assert!(iter.next().is_none());
-    }
-
-    #[test]
-    fn test_iter_descendants() {
-        let tree = small();
-        let mut iter = tree.root().iter();
-
-        let node = iter.next().unwrap();
-        assert_eq!(node.depth(), 0);
-        assert_eq!(node.data(), &1);
-
-        let node = iter.next().unwrap();
-        assert_eq!(node.depth(), 1);
-        assert_eq!(node.data(), &11);
-
-        let node = iter.next().unwrap();
-        assert_eq!(node.depth(), 1);
-        assert_eq!(node.data(), &12);
-
-        let node = iter.next().unwrap();
-        assert_eq!(node.depth(), 2);
-        assert_eq!(node.data(), &121);
-
-        let node = iter.next().unwrap();
-        assert_eq!(node.depth(), 3);
-        assert_eq!(node.data(), &1211);
-
-        let node = iter.next().unwrap();
-        assert_eq!(node.depth(), 2);
-        assert_eq!(node.data(), &122);
-
-        assert!(iter.next().is_none());
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        if self.verts.is_empty() {
+            (0, Some(0))
+        } else {
+            (1, Some(self.verts.len()))
+        }
     }
 }
