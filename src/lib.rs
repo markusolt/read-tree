@@ -1,16 +1,15 @@
-//! This crate provides a library for creating and then reading trees. The trees
-//! cannot be modified after their creation.
+//! This crate provides a library for creating and then querying trees. The
+//! trees are not intended to be modified after their initial creation.
 //!
-//! # Usage
+//! Internally trees are represented by a [Vec] of vertices where each vertex
+//! carries the payload of that node in the tree and the number of nodes in the
+//! subtree of the node, called the length of the vertex. In addition the
+//! vertices are sorted depth first; meaning every vertex is followed by the
+//! vertex of its first child. Using the length of a vertex we can easily skip a
+//! nodes entire subtree and can instantly access its sibling.
 //!
-//! This crate is available [on crates.io](https://crates.io/crates/read-tree)
-//! and can be used by adding `read-tree` to your dependencies in your projects
-//! `Cargo.toml`.
-//!
-//! ```toml
-//! [dependencies]
-//! read-tree = "0.1"
-//! ```
+//! Slicing a tree into a node is as simple as slicing the trees [Vec] of
+//! vertices into a `&[Vertex<T>]` slice.
 //!
 //! # Example
 //!
@@ -46,4 +45,4 @@ mod tree;
 #[cfg(test)]
 mod test;
 
-pub use tree::{Children, Descendants, Error, Node, Sapling, Tree};
+pub use tree::{BuildError, Children, Descendants, Node, Sapling, Tree};
