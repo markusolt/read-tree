@@ -1,8 +1,6 @@
-//! Necessary types for storing and interacting with trees.
+//! Types for storing and exploring trees.
 
 #![deny(missing_docs)]
-
-use std::fmt;
 
 /// An error returned when attempting to build a [`Sapling`]`<T>`.
 ///
@@ -27,13 +25,17 @@ pub enum BuildError<T> {
     /// When creating nodes on a sapling it is possible to [`pop`] the root node
     /// and [`push`] a second root. Trees however must have a unique root.
     ///
+    /// To get an iterator over the root nodes build the sapling into a
+    /// [`PolyTree`]`<T>` using [`build_polytree`].
+    ///
+    /// [`build_polytree`]: Sapling::build_polytree
     /// [`pop`]: Sapling::pop
     /// [`push`]: Sapling::push
     MultipleRoots(Sapling<T>),
 }
 
-impl<T> fmt::Debug for BuildError<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl<T> std::fmt::Debug for BuildError<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             BuildError::Incomplete(_) => write!(f, "Incomplete"),
             BuildError::MultipleRoots(_) => write!(f, "MultipleRoots"),
@@ -41,8 +43,8 @@ impl<T> fmt::Debug for BuildError<T> {
     }
 }
 
-impl<T> fmt::Display for BuildError<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl<T> std::fmt::Display for BuildError<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             BuildError::Incomplete(_) => write!(f, "Incomplete tree structure"),
             BuildError::MultipleRoots(_) => write!(f, "Multiple roots in tree"),
@@ -53,7 +55,7 @@ impl<T> fmt::Display for BuildError<T> {
 impl<T> std::error::Error for BuildError<T> {}
 
 /// An internal type that stores the payload and relationships of a node in a
-/// [`Tree`]`<T>`.
+/// [`Tree`]`<T>` or [`PolyTree`]`<T>`.
 ///
 /// Every node on the tree is represented by a [`Vertex`]`<T>`. The `len` field
 /// stores the number of descendants the node has; this is the number of nodes
@@ -75,7 +77,7 @@ struct Vertex<T> {
     data: T,
 }
 
-/// A builder to construct [`Tree`]`<T>`s.
+/// A builder to construct [`Tree`]`<T>`s and [`PolyTree`]`<T>`s.
 ///
 /// Saplings are the only way of creating a [`Tree`]`<T>`. New saplings are
 /// initialized empty, containing no nodes. Nodes are then added to the sapling
@@ -211,6 +213,20 @@ impl<T> Sapling<T> {
     ///
     /// [`push_leaf`]: Sapling::push_leaf
     pub fn push_tree(&mut self, tree: Tree<T>) -> Sapling<T> {
+        let mut sap = tree.into_sapling();
+        self.verts.append(&mut sap.verts);
+        sap.clear();
+        sap
+    }
+
+    /// Adds another poly-tree to the selected node in the sapling. This
+    /// operation does not change the selected node, similar to [`push_leaf`].
+    ///
+    /// Empties `tree` in the process and returns it as an empty sapling. This
+    /// allows the caller to reuse the trees internal buffers.
+    ///
+    /// [`push_leaf`]: Sapling::push_leaf
+    pub fn push_polytree(&mut self, tree: PolyTree<T>) -> Sapling<T> {
         let mut sap = tree.into_sapling();
         self.verts.append(&mut sap.verts);
         sap.clear();
@@ -420,6 +436,22 @@ impl<T> Sapling<T> {
             verts: self.verts,
         })
     }
+
+    /// Builds the sapling into a [`PolyTree`]`<T>`.
+    ///
+    /// Consumes the sapling in the process. Fails when the sapling is
+    /// incomplete. When failing to build the sapling, the sapling is returned
+    /// unmodified with the [`BuildError`]`<T>`.
+    pub fn build_polytree(self) -> Result<PolyTree<T>, BuildError<T>> {
+        if !self.is_ready() {
+            return Err(BuildError::Incomplete(self));
+        }
+
+        Ok(PolyTree {
+            path: self.path,
+            verts: self.verts,
+        })
+    }
 }
 
 /// A read-only tree data structure.
@@ -440,7 +472,7 @@ impl<T> Tree<T> {
     ///
     /// You can think of this as taking the complete slice of the tree similar
     /// to `&vec[..]` for a [`Vec`]`<T>`.
-    pub fn root(&self) -> Node<'_, T> {
+    pub fn root(&self) -> Node<T> {
         Node {
             rank: 0,
             verts: &self.verts[..],
@@ -483,7 +515,63 @@ impl<T> Tree<T> {
     }
 }
 
-/// A slice of a [`Tree`]`<T>`.
+/// A read-only poly-tree data structure.
+///
+/// Similar to [`Tree`]`<T>` but allows multiple root nodes.
+#[derive(Debug)]
+pub struct PolyTree<T> {
+    path: Vec<usize>,
+    verts: Vec<Vertex<T>>,
+}
+
+impl<T> PolyTree<T> {
+    /// Returns an iterator over the root nodes of the poly-tree.
+    pub fn roots(&self) -> Children<T> {
+        Children {
+            rank: 0,
+            verts: &self.verts[..],
+            scope: self.verts.len(),
+        }
+    }
+
+    /// Returns the node with the specified `rank`.
+    pub fn get(&self, rank: usize) -> Option<Node<T>> {
+        if rank >= self.verts.len() {
+            return None;
+        }
+
+        Some(Node {
+            rank,
+            verts: &self.verts[..],
+        })
+    }
+
+    /// Returns the number of nodes in the poly-tree.
+    ///
+    /// Because poly-trees are required to not be empty, the length will always
+    /// be at least `1`.
+    pub fn len(&self) -> usize {
+        self.verts.len()
+    }
+
+    /// Turns the poly-tree back into a sapling. No nodes are removed from the
+    /// tree; building the returned sapling will result in the original
+    /// poly-tree.
+    ///
+    /// All internal buffers are reused, making this a cheap operation. The only
+    /// cost of converting [`Sapling`]`<T>`s and [`PolyTree`]`<T>`s back and
+    /// forth is the validation that occurs during [`build_polytree`].
+    ///
+    /// [`build_polytree`]: Sapling::build_polytree
+    pub fn into_sapling(self) -> Sapling<T> {
+        Sapling {
+            path: self.path,
+            verts: self.verts,
+        }
+    }
+}
+
+/// A slice of a [`Tree`]`<T>` or [`PolyTree`]`<T>`.
 ///
 /// A node is essentially the same as a tree, except it does not own its data.
 ///
@@ -504,16 +592,22 @@ impl<'a, T> Node<'a, T> {
         &self.verts[self.rank].data
     }
 
-    /// Returns the rank of the node in the tree.
+    /// Returns the rank of the node in the tree. The rank can be used to look
+    /// up the node from the tree using [`get`].
+    ///
+    /// The rank also exposes information about the structure of the tree. Any
+    /// node `child` with a rank greater than that of a node `parent` but not
+    /// exceeding `parent.rank() + parent.len()` is a descendant of `parent`.
+    ///
+    /// [`get`]: Tree::get
     pub fn rank(&self) -> usize {
         self.rank
     }
 
-    /// Returns the number of nodes within the subtree of this node.
-    ///
-    /// The count includes the node itself; a leaf node returns length `1`.
+    /// Returns the number of descending nodes within the subtree of this node.
+    /// A leaf node returns length `0`.
     pub fn len(&self) -> usize {
-        self.verts[self.rank].len + 1
+        self.verts[self.rank].len
     }
 
     /// Returns `true` if the node has no child nodes.
@@ -521,8 +615,13 @@ impl<'a, T> Node<'a, T> {
         self.verts[self.rank].len == 0
     }
 
+    /// Returns the parent of the node or `None` if it does not have one.
+    pub fn parent(&self) -> Option<Node<T>> {
+        self.ancestors().next()
+    }
+
     /// Returns an iterator over the child nodes of the node. See [`Children`]
-    /// for more information.
+    /// for more information about the iterator.
     pub fn children(&self) -> Children<'a, T> {
         Children {
             rank: self.rank + 1,
@@ -531,16 +630,9 @@ impl<'a, T> Node<'a, T> {
         }
     }
 
-    /// Gets the node that contains the node as a child.
-    ///
-    /// Returns `None` if the node has no parent.
-    pub fn parent(&self) -> Option<Node<T>> {
-        self.ancestors().next()
-    }
-
     /// Returns a depth first iterator of nodes. It iterates all nodes in the
     /// subtree of the node, including the node itself. See [`Descendants`] for
-    /// more information.
+    /// more information about the iterator.
     pub fn descendants(&self) -> Descendants<'a, T> {
         Descendants {
             rank: self.rank,
@@ -551,20 +643,19 @@ impl<'a, T> Node<'a, T> {
 
     /// Returns an iterator over the parent nodes. The parent of the node is
     /// first. The root of the tree is last. See [`Ancestors`] for more
-    /// information.
+    /// information about the iterator.
     pub fn ancestors(&self) -> Ancestors<'a, T> {
         Ancestors {
-            root: 0,
-            target: self.rank,
+            top: 0,
+            bottom: self.rank,
             verts: self.verts,
         }
     }
 
-    /// Clones the subtree of the node into a new tree.
+    /// Clones the contents of the node into a new [`Tree`]`<T>`.
     ///
-    /// Similar to [`push_node`] this operation is a lot cheaper if `T`
-    /// implements [`Copy`]. It is internally based on
-    /// [`Vec::extend_from_slice`].
+    /// Similar to [`push_node`] this operation is cheaper if `T` implements
+    /// [`Copy`]. It is internally based on [`Vec::extend_from_slice`].
     ///
     /// [`push_node`]: Sapling::push_node
     pub fn into_tree(self) -> Tree<T>
@@ -577,6 +668,59 @@ impl<'a, T> Node<'a, T> {
         Tree {
             path: Vec::new(),
             verts,
+        }
+    }
+}
+
+/// Iterates the children of a [`Node`]`<T>`.
+///
+/// # Examples
+///
+/// ```rust
+/// use read_tree::Sapling;
+///
+/// let mut sap = Sapling::new();
+/// sap.push(1);
+/// sap.push_leaf(11);
+/// sap.push(12);
+/// sap.push_leaf(121);
+/// sap.pop();
+/// sap.pop();
+/// let tree = sap.build().unwrap();
+/// let mut iter = tree.root().children();
+///
+/// assert_eq!(iter.next().unwrap().data(), &11);
+/// assert_eq!(iter.next().unwrap().data(), &12);
+/// assert!(iter.next().is_none());
+/// ```
+#[derive(Debug)]
+pub struct Children<'a, T> {
+    rank: usize,
+    verts: &'a [Vertex<T>],
+    scope: usize,
+}
+
+impl<'a, T> Iterator for Children<'a, T> {
+    type Item = Node<'a, T>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.rank > self.scope {
+            return None;
+        }
+
+        let ret = Node {
+            rank: self.rank,
+            verts: self.verts,
+        };
+        self.rank += self.verts[self.rank].len + 1;
+        Some(ret)
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        if self.rank > self.scope {
+            (0, Some(0))
+        } else {
+            (1, Some(self.scope - self.rank + 1))
         }
     }
 }
@@ -637,17 +781,20 @@ impl<'a, T> Iterator for Descendants<'a, T> {
     }
 }
 
-/// An iterator of the ancestor nodes of a node.
+/// An iterator of the ancestors of a node.
 ///
 /// The first yielded node is the nodes parent. The last yielded node is the
 /// root node of the tree. The iterator implements [`DoubleEndedIterator`],
-/// allowing you to reverse it. It also implements a fast [`last`] method.
-///
-/// [`last`]: Iterator::last
+/// allowing it to be reversed using [`Iterator::rev`].
 #[derive(Debug)]
 pub struct Ancestors<'a, T> {
-    root: usize,
-    target: usize,
+    /// The rank of the next potential top most ancestor. Should be initialized
+    /// as `0` to first consider the root node.
+    top: usize,
+
+    /// The rank of the previously found bottom most ancestor. Should be
+    /// initialized as the rank of the starting node.
+    bottom: usize,
     verts: &'a [Vertex<T>],
 }
 
@@ -655,13 +802,13 @@ impl<'a, T> Iterator for Ancestors<'a, T> {
     type Item = Node<'a, T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.target == 0 {
+        if self.bottom == 0 {
             return None;
         }
 
-        for i in (self.root..self.target).rev() {
-            if self.target <= i + self.verts[i].len {
-                self.target = i;
+        for i in (self.top..self.bottom).rev() {
+            if self.bottom <= i + self.verts[i].len {
+                self.bottom = i;
                 return Some(Node {
                     rank: i,
                     verts: self.verts,
@@ -673,10 +820,7 @@ impl<'a, T> Iterator for Ancestors<'a, T> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        // The upper bound `self.root - self.target` is actually `1` greater than
-        // necessary. This is to handle `self.root == self.target` without underflowing
-        // the computed [`usize`].
-        (0, Some(self.root - self.target))
+        (0, Some(self.top - self.bottom))
     }
 
     fn count(self) -> usize {
@@ -686,21 +830,19 @@ impl<'a, T> Iterator for Ancestors<'a, T> {
     }
 
     fn last(mut self) -> Option<Self::Item> {
-        // I am not sure if this is already the default for double ended iterators.
-        // Seems like an obvious optimization.
         self.next_back()
     }
 }
 
 impl<'a, T> DoubleEndedIterator for Ancestors<'a, T> {
     fn next_back(&mut self) -> Option<Self::Item> {
-        let mut i = self.root;
-        while i < self.target {
+        let mut i = self.top;
+        while i < self.bottom {
             let len = self.verts[i].len;
-            if i + len < self.target {
+            if i + len < self.bottom {
                 i += len + 1;
             } else {
-                self.root = i + 1;
+                self.top = i + 1;
                 return Some(Node {
                     rank: i,
                     verts: self.verts,
@@ -709,58 +851,5 @@ impl<'a, T> DoubleEndedIterator for Ancestors<'a, T> {
         }
 
         None
-    }
-}
-
-/// An iterator of child nodes.
-///
-/// # Examples
-///
-/// ```rust
-/// use read_tree::Sapling;
-///
-/// let mut sap = Sapling::new();
-/// sap.push(1);
-/// sap.push_leaf(11);
-/// sap.push(12);
-/// sap.push_leaf(121);
-/// sap.pop();
-/// sap.pop();
-/// let tree = sap.build().unwrap();
-/// let mut iter = tree.root().children();
-///
-/// assert_eq!(iter.next().unwrap().data(), &11);
-/// assert_eq!(iter.next().unwrap().data(), &12);
-/// assert!(iter.next().is_none());
-/// ```
-#[derive(Debug)]
-pub struct Children<'a, T> {
-    rank: usize,
-    verts: &'a [Vertex<T>],
-    scope: usize,
-}
-
-impl<'a, T> Iterator for Children<'a, T> {
-    type Item = Node<'a, T>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.rank > self.scope {
-            return None;
-        }
-
-        let ret = Node {
-            rank: self.rank,
-            verts: self.verts,
-        };
-        self.rank += self.verts[self.rank].len + 1;
-        Some(ret)
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        if self.rank > self.scope {
-            (0, Some(0))
-        } else {
-            (1, Some(self.scope - self.rank + 1))
-        }
     }
 }

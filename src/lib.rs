@@ -45,4 +45,4 @@ mod tree;
 #[cfg(test)]
 mod test;
 
-pub use tree::{BuildError, Children, Descendants, Node, Sapling, Tree};
+pub use tree::{Ancestors, BuildError, Children, Descendants, Node, PolyTree, Sapling, Tree};
