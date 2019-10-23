@@ -512,7 +512,7 @@ impl<'a, T> Node<'a, T> {
     /// Returns a depth first iterator of nodes. It iterates all nodes in the
     /// subtree of the node, including the node itself. See [`Descendants`] for
     /// more information.
-    pub fn iter(&self) -> Descendants<'a, T> {
+    pub fn descendants(&self) -> Descendants<'a, T> {
         Descendants {
             rank: self.rank,
             verts: self.verts,
@@ -567,7 +567,7 @@ impl<'a, T> Node<'a, T> {
 /// sap.pop();
 /// sap.pop();
 /// let tree = sap.build().unwrap();
-/// let mut iter = tree.root().iter();
+/// let mut iter = tree.root().descendants();
 ///
 /// assert_eq!(iter.next().unwrap().data(), &1);
 /// assert_eq!(iter.next().unwrap().data(), &11);

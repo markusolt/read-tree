@@ -85,7 +85,7 @@ mod test_node {
     fn test_to_tree() {
         let tree_1 = small();
         let tree_2 = tree_1.root().into_tree();
-        for (n1, n2) in tree_1.root().iter().zip(tree_2.root().iter()) {
+        for (n1, n2) in tree_1.root().descendants().zip(tree_2.root().descendants()) {
             assert_eq!(n1.data(), n2.data());
         }
     }
@@ -107,7 +107,7 @@ mod test_iter {
     #[test]
     fn test_iter_descendants() {
         let tree = small();
-        let mut iter = tree.root().iter();
+        let mut iter = tree.root().descendants();
 
         assert_eq!(iter.next().unwrap().data(), &1);
         assert_eq!(iter.next().unwrap().data(), &11);
