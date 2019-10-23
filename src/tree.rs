@@ -542,6 +542,17 @@ impl<'a, T> Node<'a, T> {
         }
     }
 
+    /// Returns an iterator over the parent nodes. The parent of the node is
+    /// first. The root of the tree is last. See [`Ancestors`] for more
+    /// information.
+    pub fn ancestors(&self) -> Ancestors<'a, T> {
+        Ancestors {
+            root: 0,
+            target: self.rank,
+            verts: self.verts,
+        }
+    }
+
     /// Clones the subtree of the node into a new tree.
     ///
     /// Similar to [`push_node`] this operation is a lot cheaper if `T`
@@ -616,6 +627,81 @@ impl<'a, T> Iterator for Descendants<'a, T> {
 
     fn count(self) -> usize {
         self.scope - self.rank + 1
+    }
+}
+
+/// An iterator of the ancestor nodes of a node.
+///
+/// The first yielded node is the nodes parent. The last yielded node is the
+/// root node of the tree. The iterator implements [`DoubleEndedIterator`],
+/// allowing you to reverse it. It also implements a fast [`last`] method.
+///
+/// [`last`]: Iterator::last
+#[derive(Debug)]
+pub struct Ancestors<'a, T> {
+    root: usize,
+    target: usize,
+    verts: &'a [Vertex<T>],
+}
+
+impl<'a, T> Iterator for Ancestors<'a, T> {
+    type Item = Node<'a, T>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.target == 0 {
+            return None;
+        }
+
+        for i in (self.root..self.target).rev() {
+            if self.target <= i + self.verts[i].len {
+                self.target = i;
+                return Some(Node {
+                    rank: i,
+                    verts: self.verts,
+                });
+            }
+        }
+
+        None
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        // The upper bound `self.root - self.target` is actually `1` greater than
+        // necessary. This is to handle `self.root == self.target` without underflowing
+        // the computed [`usize`].
+        (0, Some(self.root - self.target))
+    }
+
+    fn count(self) -> usize {
+        // The reverse direction of the iterator can skip subtrees and should therefor
+        // be faster for most trees.
+        self.rev().count()
+    }
+
+    fn last(mut self) -> Option<Self::Item> {
+        // I am not sure if this is already the default for double ended iterators.
+        // Seems like an obvious optimization.
+        self.next_back()
+    }
+}
+
+impl<'a, T> DoubleEndedIterator for Ancestors<'a, T> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        let mut i = self.root;
+        while i < self.target {
+            let len = self.verts[i].len;
+            if i + len < self.target {
+                i += len + 1;
+            } else {
+                self.root = i + 1;
+                return Some(Node {
+                    rank: i,
+                    verts: self.verts,
+                });
+            }
+        }
+
+        None
     }
 }
 

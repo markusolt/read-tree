@@ -117,4 +117,15 @@ mod test_iter {
         assert_eq!(iter.next().unwrap().data(), &122);
         assert!(iter.next().is_none());
     }
+
+    #[test]
+    fn test_iter_ancestors() {
+        let tree = small();
+        let mut iter = tree.get(4).unwrap().ancestors();
+
+        assert_eq!(iter.next().unwrap().data(), &121);
+        assert_eq!(iter.next().unwrap().data(), &12);
+        assert_eq!(iter.next().unwrap().data(), &1);
+        assert!(iter.next().is_none());
+    }
 }
