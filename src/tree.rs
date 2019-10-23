@@ -531,6 +531,13 @@ impl<'a, T> Node<'a, T> {
         }
     }
 
+    /// Gets the node that contains the node as a child.
+    ///
+    /// Returns `None` if the node has no parent.
+    pub fn parent(&self) -> Option<Node<T>> {
+        self.ancestors().next()
+    }
+
     /// Returns a depth first iterator of nodes. It iterates all nodes in the
     /// subtree of the node, including the node itself. See [`Descendants`] for
     /// more information.

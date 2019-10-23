@@ -82,6 +82,18 @@ mod test_node {
     use super::*;
 
     #[test]
+    fn test_parent() {
+        let tree = small();
+
+        assert!(tree.get(0).unwrap().parent().is_none());
+        assert_eq!(tree.get(1).unwrap().parent().unwrap().data(), &1);
+        assert_eq!(tree.get(2).unwrap().parent().unwrap().data(), &1);
+        assert_eq!(tree.get(3).unwrap().parent().unwrap().data(), &12);
+        assert_eq!(tree.get(4).unwrap().parent().unwrap().data(), &121);
+        assert_eq!(tree.get(5).unwrap().parent().unwrap().data(), &12);
+    }
+
+    #[test]
     fn test_to_tree() {
         let tree_1 = small();
         let tree_2 = tree_1.root().into_tree();
