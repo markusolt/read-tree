@@ -447,6 +447,18 @@ impl<T> Tree<T> {
         }
     }
 
+    /// Returns the node with the specified `rank`.
+    pub fn get(&self, rank: usize) -> Option<Node<T>> {
+        if rank >= self.verts.len() {
+            return None;
+        }
+
+        Some(Node {
+            rank,
+            verts: &self.verts[..],
+        })
+    }
+
     /// Returns the number of nodes in the tree.
     ///
     /// Because trees are required to have exactly one root node, the length
@@ -509,22 +521,22 @@ impl<'a, T> Node<'a, T> {
         self.verts[self.rank].len == 0
     }
 
+    /// Returns an iterator over the child nodes of the node. See [`Children`]
+    /// for more information.
+    pub fn children(&self) -> Children<'a, T> {
+        Children {
+            rank: self.rank + 1,
+            verts: self.verts,
+            scope: self.rank + self.verts[self.rank].len,
+        }
+    }
+
     /// Returns a depth first iterator of nodes. It iterates all nodes in the
     /// subtree of the node, including the node itself. See [`Descendants`] for
     /// more information.
     pub fn descendants(&self) -> Descendants<'a, T> {
         Descendants {
             rank: self.rank,
-            verts: self.verts,
-            scope: self.rank + self.verts[self.rank].len,
-        }
-    }
-
-    /// Returns an iterator over the child nodes of the node. See [`Children`]
-    /// for more information.
-    pub fn children(&self) -> Children<'a, T> {
-        Children {
-            rank: self.rank + 1,
             verts: self.verts,
             scope: self.rank + self.verts[self.rank].len,
         }
