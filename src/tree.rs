@@ -442,7 +442,7 @@ impl<T> Tree<T> {
     /// to `&vec[..]` for a [`Vec`]`<T>`.
     pub fn root(&self) -> Node<'_, T> {
         Node {
-            depth: 0,
+            rank: 0,
             verts: &self.verts[..],
         }
     }
@@ -482,32 +482,31 @@ impl<T> Tree<T> {
 /// available.*
 #[derive(Debug)]
 pub struct Node<'a, T> {
-    depth: usize,
+    rank: usize,
     verts: &'a [Vertex<T>],
 }
 
 impl<'a, T> Node<'a, T> {
     /// Returns a reference to the payload of the node.
     pub fn data(&self) -> &T {
-        &self.verts[0].data
+        &self.verts[self.rank].data
     }
 
-    /// Returns the depth of the node within the tree. The root node returns
-    /// depth `0`.
-    pub fn depth(&self) -> usize {
-        self.depth
+    /// Returns the rank of the node in the tree.
+    pub fn rank(&self) -> usize {
+        self.rank
     }
 
     /// Returns the number of nodes within the subtree of this node.
     ///
     /// The count includes the node itself; a leaf node returns length `1`.
     pub fn len(&self) -> usize {
-        self.verts.len()
+        self.verts[self.rank].len + 1
     }
 
     /// Returns `true` if the node has no child nodes.
     pub fn is_leaf(&self) -> bool {
-        self.verts.len() == 1
+        self.verts[self.rank].len == 0
     }
 
     /// Returns a depth first iterator of nodes. It iterates all nodes in the
@@ -515,9 +514,9 @@ impl<'a, T> Node<'a, T> {
     /// more information.
     pub fn iter(&self) -> Descendants<'a, T> {
         Descendants {
-            depth: self.depth,
+            rank: self.rank,
             verts: self.verts,
-            pos: 0,
+            scope: self.rank + self.verts[self.rank].len,
         }
     }
 
@@ -525,8 +524,9 @@ impl<'a, T> Node<'a, T> {
     /// for more information.
     pub fn children(&self) -> Children<'a, T> {
         Children {
-            child_depth: self.depth + 1,
-            verts: &self.verts[1..],
+            rank: self.rank + 1,
+            verts: self.verts,
+            scope: self.rank + self.verts[self.rank].len,
         }
     }
 
@@ -577,39 +577,33 @@ impl<'a, T> Node<'a, T> {
 /// ```
 #[derive(Debug)]
 pub struct Descendants<'a, T> {
-    depth: usize,
+    rank: usize,
     verts: &'a [Vertex<T>],
-    pos: usize,
+    scope: usize,
 }
 
 impl<'a, T> Iterator for Descendants<'a, T> {
     type Item = Node<'a, T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let verts = &self.verts[self.pos..self.pos + self.verts.get(self.pos)?.len + 1];
-
-        let mut depth = self.depth;
-        let mut i = 0;
-        while i < self.pos {
-            let len = self.verts[i].len;
-            if i + len < self.pos {
-                i += len + 1;
-            } else {
-                depth += 1;
-                i += 1;
-            }
+        if self.rank > self.scope {
+            return None;
         }
 
-        self.pos += 1;
-        Some(Node { depth, verts })
+        let ret = Node {
+            rank: self.rank,
+            verts: self.verts,
+        };
+        self.rank += 1;
+        Some(ret)
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.verts.len(), Some(self.verts.len()))
+        (self.scope - self.rank + 1, Some(self.scope - self.rank + 1))
     }
 
     fn count(self) -> usize {
-        self.verts.len()
+        self.scope - self.rank + 1
     }
 }
 
@@ -636,27 +630,32 @@ impl<'a, T> Iterator for Descendants<'a, T> {
 /// ```
 #[derive(Debug)]
 pub struct Children<'a, T> {
-    child_depth: usize,
+    rank: usize,
     verts: &'a [Vertex<T>],
+    scope: usize,
 }
 
 impl<'a, T> Iterator for Children<'a, T> {
     type Item = Node<'a, T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let (verts, remainder) = &self.verts.split_at(self.verts.get(0)?.len + 1);
-        self.verts = remainder;
-        Some(Node {
-            depth: self.child_depth,
-            verts,
-        })
+        if self.rank > self.scope {
+            return None;
+        }
+
+        let ret = Node {
+            rank: self.rank,
+            verts: self.verts,
+        };
+        self.rank += self.verts[self.rank].len + 1;
+        Some(ret)
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        if self.verts.is_empty() {
+        if self.rank > self.scope {
             (0, Some(0))
         } else {
-            (1, Some(self.verts.len()))
+            (1, Some(self.scope - self.rank + 1))
         }
     }
 }

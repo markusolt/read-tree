@@ -99,14 +99,8 @@ mod test_iter {
         let tree = small();
         let mut iter = tree.root().children();
 
-        let node = iter.next().unwrap();
-        assert_eq!(node.depth(), 1);
-        assert_eq!(node.data(), &11);
-
-        let node = iter.next().unwrap();
-        assert_eq!(node.depth(), 1);
-        assert_eq!(node.data(), &12);
-
+        assert_eq!(iter.next().unwrap().data(), &11);
+        assert_eq!(iter.next().unwrap().data(), &12);
         assert!(iter.next().is_none());
     }
 
@@ -115,30 +109,12 @@ mod test_iter {
         let tree = small();
         let mut iter = tree.root().iter();
 
-        let node = iter.next().unwrap();
-        assert_eq!(node.depth(), 0);
-        assert_eq!(node.data(), &1);
-
-        let node = iter.next().unwrap();
-        assert_eq!(node.depth(), 1);
-        assert_eq!(node.data(), &11);
-
-        let node = iter.next().unwrap();
-        assert_eq!(node.depth(), 1);
-        assert_eq!(node.data(), &12);
-
-        let node = iter.next().unwrap();
-        assert_eq!(node.depth(), 2);
-        assert_eq!(node.data(), &121);
-
-        let node = iter.next().unwrap();
-        assert_eq!(node.depth(), 3);
-        assert_eq!(node.data(), &1211);
-
-        let node = iter.next().unwrap();
-        assert_eq!(node.depth(), 2);
-        assert_eq!(node.data(), &122);
-
+        assert_eq!(iter.next().unwrap().data(), &1);
+        assert_eq!(iter.next().unwrap().data(), &11);
+        assert_eq!(iter.next().unwrap().data(), &12);
+        assert_eq!(iter.next().unwrap().data(), &121);
+        assert_eq!(iter.next().unwrap().data(), &1211);
+        assert_eq!(iter.next().unwrap().data(), &122);
         assert!(iter.next().is_none());
     }
 }
