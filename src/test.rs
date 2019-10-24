@@ -96,7 +96,7 @@ mod test_node {
     #[test]
     fn test_from() {
         let tree = small();
-        Node::from(tree.root().as_slice()).unwrap();
+        Node::from(tree.as_node().as_slice()).unwrap();
 
         Node::from(&[Vertex::new((), 0)]).unwrap();
         assert_eq!(Node::<()>::from(&[]).unwrap_err(), ValidationError::Empty);
@@ -127,10 +127,15 @@ mod test_node {
     #[test]
     fn test_to_tree() {
         let tree_1 = small();
-        let tree_2 = tree_1.root().into_tree();
-        for (n1, n2) in tree_1.root().descendants().zip(tree_2.root().descendants()) {
-            assert_eq!(n1.data(), n2.data());
-        }
+        let tree_2 = tree_1.as_node().into_tree();
+        assert_eq!(
+            tree_1
+                .as_node()
+                .descendants()
+                .zip(tree_2.as_node().descendants())
+                .all(|(n1, n2)| n1.data() == n2.data()),
+            true
+        );
     }
 }
 
@@ -140,7 +145,7 @@ mod test_iter {
     #[test]
     fn test_iter_children() {
         let tree = small();
-        let mut iter = tree.root().children();
+        let mut iter = tree.as_node().children();
 
         assert_eq!(iter.next().unwrap().data(), &11);
         assert_eq!(iter.next().unwrap().data(), &12);
@@ -151,7 +156,7 @@ mod test_iter {
     fn test_iter_descendants() {
         let tree = small();
 
-        let mut iter = tree.root().descendants();
+        let mut iter = tree.as_node().descendants();
         assert_eq!(iter.next().unwrap().data(), &11);
         assert_eq!(iter.next().unwrap().data(), &12);
         assert_eq!(iter.next().unwrap().data(), &121);
@@ -159,7 +164,7 @@ mod test_iter {
         assert_eq!(iter.next().unwrap().data(), &122);
         assert!(iter.next().is_none());
 
-        let mut iter = tree.root().descendants().rev();
+        let mut iter = tree.as_node().descendants().rev();
         assert_eq!(iter.next().unwrap().data(), &122);
         assert_eq!(iter.next().unwrap().data(), &1211);
         assert_eq!(iter.next().unwrap().data(), &121);
@@ -168,9 +173,9 @@ mod test_iter {
         assert!(iter.next().is_none());
 
         assert_eq!(tree.len(), 6);
-        assert_eq!(tree.root().descendants().len(), 5);
-        assert_eq!(tree.root().descendants().last().unwrap().data(), &122);
-        assert_eq!(tree.root().descendants().nth(2).unwrap().data(), &121);
+        assert_eq!(tree.as_node().descendants().len(), 5);
+        assert_eq!(tree.as_node().descendants().last().unwrap().data(), &122);
+        assert_eq!(tree.as_node().descendants().nth(2).unwrap().data(), &121);
     }
 
     #[test]

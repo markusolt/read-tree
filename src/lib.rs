@@ -35,7 +35,7 @@
 //! sap.pop();
 //!
 //! let tree = sap.build().unwrap();
-//! let root = tree.root();
+//! let root = tree.as_node();
 //!
 //! assert_eq!(root.data(), &1);
 //! ```

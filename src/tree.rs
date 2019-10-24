@@ -385,7 +385,7 @@ impl<T> Sapling<T> {
     /// sap.pop();
     ///
     /// let tree = sap.build().unwrap();
-    /// let mut iter = tree.root().children();
+    /// let mut iter = tree.as_node().children();
     ///
     /// assert_eq!(iter.next().unwrap().data(), &1);
     /// assert_eq!(iter.next().unwrap().data(), &2);
@@ -503,11 +503,15 @@ impl<T> Default for Sapling<T> {
 ///
 /// Trees are created from [`Sapling`]`<T>`s. Most interactions with trees
 /// happen on slices of them called [`Node`]s. Get a node representing the
-/// entire tree using [`root`].
+/// entire tree using [`as_node`].
 ///
-/// [`root`]: Tree::root
+/// [`as_node`]: Tree::as_node
 #[derive(Debug)]
 pub struct Tree<T> {
+    /// Unused buffer.
+    ///
+    /// The buffer was used by the sapling that was used to construct the tree.
+    /// It is kept in case the tree is turned back into a sapling.
     path: Vec<usize>,
     verts: Vec<Vertex<T>>,
 }
@@ -518,7 +522,7 @@ impl<T> Tree<T> {
     ///
     /// You can think of this as taking the complete slice of the tree similar
     /// to `&vec[..]` for a [`Vec`]`<T>`.
-    pub fn root(&self) -> Node<T> {
+    pub fn as_node(&self) -> Node<T> {
         Node {
             rank: 0,
             verts: &self.verts[..],
@@ -726,9 +730,9 @@ impl<'a, T> Node<'a, T> {
     /// Returns the node with the specified `rank`.
     ///
     /// The rank must be relative to the trees root, or the most recently pruned
-    /// node. See [`prune`] for more information.
+    /// node. See [`isolated`] for more information.
     ///
-    /// [`prune`]: Node::prune
+    /// [`isolated`]: Node::isolated
     pub fn get(self, rank: usize) -> Option<Node<'a, T>> {
         if rank >= self.verts.len() {
             return None;
@@ -772,15 +776,15 @@ impl<'a, T> Node<'a, T> {
 
     /// Returns the node isolated from the rest of the tree.
     ///
-    /// A pruned node will always have rank `0`, and it will be impossible to
-    /// access ancestors from it. It is still possible to explore the subtree
-    /// below the node.
+    /// An isolated node will always have rank `0`, and it will be impossible to
+    /// access its ancestors. It is still possible to explore the subtree below
+    /// the node.
     ///
     /// When getting nodes by rank you must get them from this or any descending
-    /// node. If you use the rank in a node that is not affected by this prune,
-    /// it will return some other node. Think of the pruned node as an entirely
-    /// new tree with its own ranks.
-    pub fn prune(self) -> Node<'a, T> {
+    /// node. If you use the rank in a node that is not affected by this
+    /// isolation, it will return some other node. Think of the isolated node as
+    /// an entirely new tree with its own ranking.
+    pub fn isolated(self) -> Node<'a, T> {
         Node {
             rank: 0,
             verts: &self.verts[self.rank..=self.rank + self.verts[self.rank].len],
@@ -831,7 +835,7 @@ impl<'a, T> Clone for Node<'a, T> {
 ///     sap.pop();
 ///     sap.pop();
 ///     let tree = sap.build()?;
-///     let mut iter = tree.root().children();
+///     let mut iter = tree.as_node().children();
 ///
 ///     assert_eq!(iter.next().unwrap().data(), &11);
 ///     assert_eq!(iter.next().unwrap().data(), &12);
@@ -909,7 +913,7 @@ impl<'a, T> Iterator for Children<'a, T> {
 ///     sap.pop();
 ///     sap.pop();
 ///     let tree = sap.build()?;
-///     let mut iter = tree.root().descendants();
+///     let mut iter = tree.as_node().descendants();
 ///
 ///     assert_eq!(iter.len(), 4);
 ///     assert_eq!(iter.next().unwrap().data(), &11);
