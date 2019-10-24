@@ -72,7 +72,7 @@ impl<T> std::error::Error for BuildError<T> {}
 /// [`Vec::extend_from_slice`] executes as fast as possible. This method is used
 /// by [`Sapling::push_tree`] to copy the nodes of a tree into another sapling.
 #[derive(Debug, Clone, Copy)]
-struct Vertex<T> {
+pub struct Vertex<T> {
     len: usize,
     data: T,
 }
