@@ -528,9 +528,9 @@ impl<T> PolyTree<T> {
     /// Returns an iterator over the root nodes of the poly-tree.
     pub fn roots(&self) -> Children<T> {
         Children {
-            rank: 0,
+            top: 0,
+            bottom: self.verts.len(),
             verts: &self.verts[..],
-            scope: self.verts.len(),
         }
     }
 
@@ -640,33 +640,21 @@ impl<'a, T> Node<'a, T> {
     /// Returns an iterator over the child nodes of the node. See [`Children`]
     /// for more information about the iterator.
     pub fn children(self) -> Children<'a, T> {
-        Children {
-            rank: self.rank + 1,
-            verts: self.verts,
-            scope: self.rank + self.verts[self.rank].len,
-        }
+        Children::from(self)
     }
 
     /// Returns a depth first iterator of nodes. It iterates all nodes in the
     /// subtree of the node, including the node itself. See [`Descendants`] for
     /// more information about the iterator.
     pub fn descendants(self) -> Descendants<'a, T> {
-        Descendants {
-            rank: self.rank,
-            verts: self.verts,
-            scope: self.rank + self.verts[self.rank].len,
-        }
+        Descendants::from(self)
     }
 
     /// Returns an iterator over the parent nodes. The parent of the node is
     /// first. The root of the tree is last. See [`Ancestors`] for more
     /// information about the iterator.
     pub fn ancestors(self) -> Ancestors<'a, T> {
-        Ancestors {
-            top: 0,
-            bottom: self.rank,
-            verts: self.verts,
-        }
+        Ancestors::from(self)
     }
 
     /// Returns the node isolated from the rest of the tree.
@@ -714,137 +702,224 @@ impl<'a, T> Clone for Node<'a, T> {
     }
 }
 
-/// Iterates the children of a [`Node`]`<T>`.
+/// Iterates the children of a node.
 ///
 /// # Examples
 ///
 /// ```rust
 /// use read_tree::Sapling;
 ///
-/// let mut sap = Sapling::new();
-/// sap.push(1);
-/// sap.push_leaf(11);
-/// sap.push(12);
-/// sap.push_leaf(121);
-/// sap.pop();
-/// sap.pop();
-/// let tree = sap.build().unwrap();
-/// let mut iter = tree.root().children();
+/// fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     let mut sap = Sapling::new();
+///     sap.push(1);
+///     sap.push_leaf(11);
+///     sap.push(12);
+///     sap.push_leaf(121);
+///     sap.pop();
+///     sap.pop();
+///     let tree = sap.build()?;
+///     let mut iter = tree.root().children();
 ///
-/// assert_eq!(iter.next().unwrap().data(), &11);
-/// assert_eq!(iter.next().unwrap().data(), &12);
-/// assert!(iter.next().is_none());
+///     assert_eq!(iter.next().unwrap().data(), &11);
+///     assert_eq!(iter.next().unwrap().data(), &12);
+///     assert!(iter.next().is_none());
+///
+///     Ok(())
+/// }
 /// ```
 #[derive(Debug)]
 pub struct Children<'a, T> {
-    rank: usize,
+    /// The next child node.
+    top: usize,
+
+    /// One beyond the last child node.
+    bottom: usize,
     verts: &'a [Vertex<T>],
-    scope: usize,
+}
+
+impl<'a, T> Children<'a, T> {
+    /// Creates a new iterator over the children of a node.
+    pub fn from(node: Node<'a, T>) -> Self {
+        Children {
+            top: node.rank() + 1,
+            bottom: node.rank() + node.len() + 1,
+            verts: node.verts,
+        }
+    }
 }
 
 impl<'a, T> Iterator for Children<'a, T> {
     type Item = Node<'a, T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.rank > self.scope {
+        if self.top >= self.bottom {
             return None;
         }
 
         let ret = Node {
-            rank: self.rank,
+            rank: self.top,
             verts: self.verts,
         };
-        self.rank += self.verts[self.rank].len + 1;
+        self.top += self.verts[self.top].len + 1;
         Some(ret)
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        if self.rank > self.scope {
+        if self.top >= self.bottom {
             (0, Some(0))
         } else {
-            (1, Some(self.scope - self.rank + 1))
+            (1, Some(self.bottom - self.top))
         }
     }
 }
 
-/// A depth first iterator of [`Node`]`<T>`s. It iterates all nodes in a
-/// subtree, including the root node.
+/// Iterates all descendants of a node depth first.
+///
+/// The iterator implements [`ExactSizeIterator`] and [`DoubleEndedIterator`]
+/// giving access to [`len`] and [`rev`]. It also has fast implementations for
+/// [`nth`] and [`last`].
+///
 ///
 /// # Examples
 ///
 /// ```rust
 /// use read_tree::Sapling;
 ///
-/// let mut sap = Sapling::new();
-/// sap.push(1);
-/// sap.push_leaf(11);
-/// sap.push(12);
-/// sap.push_leaf(121);
-/// sap.pop();
-/// sap.pop();
-/// let tree = sap.build().unwrap();
-/// let mut iter = tree.root().descendants();
+/// fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     let mut sap = Sapling::new();
+///     sap.push(1);
+///     sap.push(11);
+///     sap.push_leaf(111);
+///     sap.pop();
+///     sap.push(12);
+///     sap.push_leaf(121);
+///     sap.pop();
+///     sap.pop();
+///     let tree = sap.build()?;
+///     let mut iter = tree.root().descendants();
 ///
-/// assert_eq!(iter.next().unwrap().data(), &1);
-/// assert_eq!(iter.next().unwrap().data(), &11);
-/// assert_eq!(iter.next().unwrap().data(), &12);
-/// assert_eq!(iter.next().unwrap().data(), &121);
-/// assert!(iter.next().is_none());
+///     assert_eq!(iter.len(), 4);
+///     assert_eq!(iter.next().unwrap().data(), &11);
+///     assert_eq!(iter.next().unwrap().data(), &111);
+///     assert_eq!(iter.next().unwrap().data(), &12);
+///     assert_eq!(iter.next().unwrap().data(), &121);
+///     assert!(iter.next().is_none());
+///
+///     Ok(())
+/// }
 /// ```
+///
+/// [`last`]: Iterator::last
+/// [`len`]: ExactSizeIterator::len
+/// [`nth`]: Iterator::nth
+/// [`rev`]: Iterator::rev
 #[derive(Debug)]
 pub struct Descendants<'a, T> {
-    rank: usize,
+    /// The next node to yield from the top.
+    top: usize,
+
+    /// The previously yielded node from the bottom
+    bottom: usize,
     verts: &'a [Vertex<T>],
-    scope: usize,
+}
+
+impl<'a, T> Descendants<'a, T> {
+    /// Creates a new iterator over the descendants of a node.
+    pub fn from(node: Node<'a, T>) -> Self {
+        Descendants {
+            top: node.rank() + 1,
+            bottom: node.rank() + node.len() + 1,
+            verts: node.verts,
+        }
+    }
 }
 
 impl<'a, T> Iterator for Descendants<'a, T> {
     type Item = Node<'a, T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.rank > self.scope {
+        if self.top >= self.bottom {
             return None;
         }
 
         let ret = Node {
-            rank: self.rank,
+            rank: self.top,
             verts: self.verts,
         };
-        self.rank += 1;
+        self.top += 1;
         Some(ret)
     }
 
+    fn nth(&mut self, n: usize) -> Option<Self::Item> {
+        self.top += n;
+        self.next()
+    }
+
+    fn last(mut self) -> Option<Self::Item> {
+        self.next_back()
+    }
+
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.scope - self.rank + 1, Some(self.scope - self.rank + 1))
+        (self.len(), Some(self.len()))
     }
 
     fn count(self) -> usize {
-        self.scope - self.rank + 1
+        self.len()
     }
 }
 
-/// An iterator of the ancestors of a node.
+impl<'a, T> DoubleEndedIterator for Descendants<'a, T> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        if self.top >= self.bottom {
+            return None;
+        }
+
+        self.bottom -= 1;
+        Some(Node {
+            rank: self.bottom,
+            verts: self.verts,
+        })
+    }
+}
+
+impl<'a, T> ExactSizeIterator for Descendants<'a, T> {
+    fn len(&self) -> usize {
+        self.bottom - self.top
+    }
+}
+
+/// Iterates all ancestors of a node starting with the parent of the node.
 ///
-/// The first yielded node is the nodes parent. The last yielded node is the
-/// root node of the tree. The iterator implements [`DoubleEndedIterator`],
-/// allowing it to be reversed using [`Iterator::rev`].
+/// The iterator implements [`DoubleEndedIterator`], allowing it to be reversed
+/// using [`rev`].
+///
+/// [`rev`]: Iterator::rev
 #[derive(Debug)]
 pub struct Ancestors<'a, T> {
-    /// The rank of the next potential top most ancestor. Should be initialized
-    /// as `0` to first consider the root node.
+    /// The next potential top most ancestor.
     top: usize,
 
-    /// The rank of the previously found bottom most ancestor. Should be
-    /// initialized as the rank of the starting node.
+    /// The previously found bottom most ancestor.
     bottom: usize,
     verts: &'a [Vertex<T>],
+}
+
+impl<'a, T> Ancestors<'a, T> {
+    /// Creates a new iterator over the ancestors of a node.
+    pub fn from(node: Node<'a, T>) -> Self {
+        Ancestors {
+            top: 0,
+            bottom: node.rank(),
+            verts: node.verts,
+        }
+    }
 }
 
 impl<'a, T> Iterator for Ancestors<'a, T> {
     type Item = Node<'a, T>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.bottom == 0 {
+        if self.top >= self.bottom {
             return None;
         }
 

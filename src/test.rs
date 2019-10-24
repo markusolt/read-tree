@@ -119,15 +119,27 @@ mod test_iter {
     #[test]
     fn test_iter_descendants() {
         let tree = small();
-        let mut iter = tree.root().descendants();
 
-        assert_eq!(iter.next().unwrap().data(), &1);
+        let mut iter = tree.root().descendants();
         assert_eq!(iter.next().unwrap().data(), &11);
         assert_eq!(iter.next().unwrap().data(), &12);
         assert_eq!(iter.next().unwrap().data(), &121);
         assert_eq!(iter.next().unwrap().data(), &1211);
         assert_eq!(iter.next().unwrap().data(), &122);
         assert!(iter.next().is_none());
+
+        let mut iter = tree.root().descendants().rev();
+        assert_eq!(iter.next().unwrap().data(), &122);
+        assert_eq!(iter.next().unwrap().data(), &1211);
+        assert_eq!(iter.next().unwrap().data(), &121);
+        assert_eq!(iter.next().unwrap().data(), &12);
+        assert_eq!(iter.next().unwrap().data(), &11);
+        assert!(iter.next().is_none());
+
+        assert_eq!(tree.len(), 6);
+        assert_eq!(tree.root().descendants().len(), 5);
+        assert_eq!(tree.root().descendants().last().unwrap().data(), &122);
+        assert_eq!(tree.root().descendants().nth(2).unwrap().data(), &121);
     }
 
     #[test]
