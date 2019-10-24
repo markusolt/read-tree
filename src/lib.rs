@@ -46,5 +46,6 @@ mod tree;
 mod test;
 
 pub use tree::{
-    Ancestors, BuildError, Children, Descendants, Node, PolyTree, Sapling, Tree, Vertex,
+    Ancestors, BuildError, Children, Descendants, Node, PolyTree, Sapling, Tree, ValidationError,
+    Vertex,
 };

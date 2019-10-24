@@ -54,6 +54,37 @@ impl<T> std::fmt::Display for BuildError<T> {
 
 impl<T> std::error::Error for BuildError<T> {}
 
+/// An error returned when validating a vertex slice.
+#[derive(Debug, PartialEq, Copy, Clone)]
+pub enum ValidationError {
+    /// The vertex slice is empty.
+    ///
+    /// Nodes must always have exactly one root. The buffer therefor needs to
+    /// have at least one entry.
+    Empty,
+
+    /// The vertex slice contains more than one root node.
+    ///
+    /// Nodes can only have exactly one root node.
+    MultipleRoots,
+
+    /// Some of the lengths of the vertices do not match up. Ensure a vertex
+    /// does not have more descendants than its ancestors.
+    IllegalStructure,
+}
+
+impl std::fmt::Display for ValidationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::Empty => write!(f, "Empty vertex slice"),
+            Self::MultipleRoots => write!(f, "Multiple roots in vertex slice"),
+            Self::IllegalStructure => write!(f, "Vertex with invalid length"),
+        }
+    }
+}
+
+impl std::error::Error for ValidationError {}
+
 /// An internal type that stores the payload and relationships of a node in a
 /// [`Tree`]`<T>` or [`PolyTree`]`<T>`.
 ///
@@ -75,6 +106,14 @@ impl<T> std::error::Error for BuildError<T> {}
 pub struct Vertex<T> {
     len: usize,
     data: T,
+}
+
+impl<T> Vertex<T> {
+    /// Returns a new vertex with payload `data` intending to own `len` many
+    /// descendants.
+    pub fn new(data: T, len: usize) -> Self {
+        Vertex { data, len }
+    }
 }
 
 /// A builder to construct [`Tree`]`<T>`s and [`PolyTree`]`<T>`s.
@@ -595,6 +634,67 @@ pub struct Node<'a, T> {
 }
 
 impl<'a, T> Node<'a, T> {
+    /// Turns a slice of vertices into a [`Node`]`<T>`, after performing some
+    /// validations.
+    ///
+    /// Returns an error in case of a failed validation. For the possible errors
+    /// see [`ValidationError`]. For a more detailed description of the
+    /// validation process see the safety section for [`from_unchecked`].
+    ///
+    /// To avoid running the validations; which have a significant cost for
+    /// large trees; use the unsafe alternative [`from_unchecked`].
+    ///
+    /// [`from_unchecked`]: Node::from_unchecked
+    pub fn from(verts: &[Vertex<T>]) -> Result<Node<T>, ValidationError> {
+        if verts.is_empty() {
+            return Err(ValidationError::Empty);
+        }
+        if verts[0].len != verts.len() - 1 {
+            return Err(ValidationError::MultipleRoots);
+        }
+
+        let mut path = Vec::new();
+        for (i, val) in verts.iter().enumerate() {
+            while path.last() == Some(&i) {
+                path.pop();
+            }
+
+            let scope = i + val.len + 1;
+            if path.last().map(|head| *head < scope) == Some(true) {
+                return Err(ValidationError::IllegalStructure);
+            }
+            path.push(scope);
+        }
+
+        Ok(Node { rank: 0, verts })
+    }
+
+    /// Returns a slice of vertices as a [`Node`]`<T>`.
+    ///
+    /// This is the unsafe alternative to [`from`] that skips all validations.
+    ///
+    /// # Safety
+    ///
+    /// The caller must guarantee that all expected qualities of the vertex
+    /// slice are fulfilled.
+    ///
+    /// 1. The vertex slice must not be empty.
+    /// 2. The first vertex must span the entire slice.
+    ///
+    ///    This means that the `len` of the first vertex is equal to
+    ///    `verts.len() - 1`.
+    ///
+    /// 3. The scope of all vertices must be contained within the scope of its
+    ///    parent vertex
+    ///
+    ///    Here `scope` refers to the range starting from a nodes index to the
+    ///    nodes index plus its `len` inclusive.
+    ///
+    /// [`from`]: Node::from
+    pub unsafe fn from_unchecked(verts: &[Vertex<T>]) -> Node<T> {
+        Node { rank: 0, verts }
+    }
+
     /// Returns a reference to the payload of the node.
     pub fn data(self) -> &'a T {
         &self.verts[self.rank].data
@@ -663,6 +763,11 @@ impl<'a, T> Node<'a, T> {
     /// information about the iterator.
     pub fn ancestors(self) -> Ancestors<'a, T> {
         Ancestors::from(self)
+    }
+
+    /// Returns the nodes internal vertex slice.
+    pub fn as_slice(self) -> &'a [Vertex<T>] {
+        self.verts
     }
 
     /// Returns the node isolated from the rest of the tree.

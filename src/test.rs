@@ -94,6 +94,37 @@ mod test_node {
     }
 
     #[test]
+    fn test_from() {
+        let tree = small();
+        Node::from(tree.root().as_slice()).unwrap();
+
+        Node::from(&[Vertex::new((), 0)]).unwrap();
+        assert_eq!(Node::<()>::from(&[]).unwrap_err(), ValidationError::Empty);
+        assert_eq!(
+            Node::from(&[Vertex::new((), 0), Vertex::new((), 0)]).unwrap_err(),
+            ValidationError::MultipleRoots
+        );
+        assert_eq!(
+            Node::from(&[Vertex::new((), 1)]).unwrap_err(),
+            ValidationError::MultipleRoots
+        );
+        assert_eq!(
+            Node::from(&[Vertex::new((), 1), Vertex::new((), 1)]).unwrap_err(),
+            ValidationError::IllegalStructure
+        );
+        assert_eq!(
+            Node::from(&[
+                Vertex::new((), 3),
+                Vertex::new((), 1),
+                Vertex::new((), 1),
+                Vertex::new((), 0),
+            ])
+            .unwrap_err(),
+            ValidationError::IllegalStructure
+        );
+    }
+
+    #[test]
     fn test_to_tree() {
         let tree_1 = small();
         let tree_2 = tree_1.root().into_tree();
