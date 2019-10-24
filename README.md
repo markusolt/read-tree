@@ -8,7 +8,7 @@ Add the following to your `cargo.toml` file.
 
 ```toml
 [dependencies]
-read-tree = "0.1"
+read-tree = "0.2"
 ```
 
 # Description
@@ -55,3 +55,23 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 ```
+
+# Changelog
+
+# Version `0.2.0`
+- Breaking changes
+    - Removed `Node::depth`
+    - Changed `Node::len` to no longer includes the node itself in the count
+    - Changed `Descendants` to no longer include the node itself
+    - Renamed `Node::iter` into `Node::descendants`
+- Additions
+    - Made `Vertex` public
+    - Added `PolyTree`
+    - Added `Ancestors` iterator
+- Improvements
+    - Implemented more traits for error enums
+    - Implemented more traits and overrides for iterators
+
+# Version `0.1.0`
+
+Initial Release.
