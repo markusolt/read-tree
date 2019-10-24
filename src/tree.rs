@@ -588,7 +588,7 @@ pub struct Node<'a, T> {
 
 impl<'a, T> Node<'a, T> {
     /// Returns a reference to the payload of the node.
-    pub fn data(&self) -> &T {
+    pub fn data(self) -> &'a T {
         &self.verts[self.rank].data
     }
 
@@ -600,29 +600,29 @@ impl<'a, T> Node<'a, T> {
     /// exceeding `parent.rank() + parent.len()` is a descendant of `parent`.
     ///
     /// [`get`]: Tree::get
-    pub fn rank(&self) -> usize {
+    pub fn rank(self) -> usize {
         self.rank
     }
 
     /// Returns the number of descending nodes within the subtree of this node.
     /// A leaf node returns length `0`.
-    pub fn len(&self) -> usize {
+    pub fn len(self) -> usize {
         self.verts[self.rank].len
     }
 
     /// Returns `true` if the node has no child nodes.
-    pub fn is_leaf(&self) -> bool {
+    pub fn is_leaf(self) -> bool {
         self.verts[self.rank].len == 0
     }
 
     /// Returns the parent of the node or `None` if it does not have one.
-    pub fn parent(&self) -> Option<Node<T>> {
+    pub fn parent(self) -> Option<Node<'a, T>> {
         self.ancestors().next()
     }
 
     /// Returns an iterator over the child nodes of the node. See [`Children`]
     /// for more information about the iterator.
-    pub fn children(&self) -> Children<'a, T> {
+    pub fn children(self) -> Children<'a, T> {
         Children {
             rank: self.rank + 1,
             verts: self.verts,
@@ -633,7 +633,7 @@ impl<'a, T> Node<'a, T> {
     /// Returns a depth first iterator of nodes. It iterates all nodes in the
     /// subtree of the node, including the node itself. See [`Descendants`] for
     /// more information about the iterator.
-    pub fn descendants(&self) -> Descendants<'a, T> {
+    pub fn descendants(self) -> Descendants<'a, T> {
         Descendants {
             rank: self.rank,
             verts: self.verts,
@@ -644,7 +644,7 @@ impl<'a, T> Node<'a, T> {
     /// Returns an iterator over the parent nodes. The parent of the node is
     /// first. The root of the tree is last. See [`Ancestors`] for more
     /// information about the iterator.
-    pub fn ancestors(&self) -> Ancestors<'a, T> {
+    pub fn ancestors(self) -> Ancestors<'a, T> {
         Ancestors {
             top: 0,
             bottom: self.rank,
@@ -669,6 +669,14 @@ impl<'a, T> Node<'a, T> {
             path: Vec::new(),
             verts,
         }
+    }
+}
+
+impl<'a, T> Copy for Node<'a, T> {}
+
+impl<'a, T> Clone for Node<'a, T> {
+    fn clone(&self) -> Self {
+        *self
     }
 }
 
