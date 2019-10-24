@@ -615,6 +615,23 @@ impl<'a, T> Node<'a, T> {
         self.verts[self.rank].len == 0
     }
 
+    /// Returns the node with the specified `rank`.
+    ///
+    /// The rank must be relative to the trees root, or the most recently pruned
+    /// node. See [`prune`] for more information.
+    ///
+    /// [`prune`]: Node::prune
+    pub fn get(self, rank: usize) -> Option<Node<'a, T>> {
+        if rank >= self.verts.len() {
+            return None;
+        }
+
+        Some(Node {
+            rank,
+            verts: self.verts,
+        })
+    }
+
     /// Returns the parent of the node or `None` if it does not have one.
     pub fn parent(self) -> Option<Node<'a, T>> {
         self.ancestors().next()
@@ -649,6 +666,23 @@ impl<'a, T> Node<'a, T> {
             top: 0,
             bottom: self.rank,
             verts: self.verts,
+        }
+    }
+
+    /// Returns the node isolated from the rest of the tree.
+    ///
+    /// A pruned node will always have rank `0`, and it will be impossible to
+    /// access ancestors from it. It is still possible to explore the subtree
+    /// below the node.
+    ///
+    /// When getting nodes by rank you must get them from this or any descending
+    /// node. If you use the rank in a node that is not affected by this prune,
+    /// it will return some other node. Think of the pruned node as an entirely
+    /// new tree with its own ranks.
+    pub fn prune(self) -> Node<'a, T> {
+        Node {
+            rank: 0,
+            verts: &self.verts[self.rank..=self.rank + self.verts[self.rank].len],
         }
     }
 
