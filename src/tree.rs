@@ -37,8 +37,8 @@ pub enum BuildError<T> {
 impl<T> std::fmt::Debug for BuildError<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            BuildError::Incomplete(_) => write!(f, "Incomplete"),
-            BuildError::MultipleRoots(_) => write!(f, "MultipleRoots"),
+            Self::Incomplete(_) => write!(f, "Incomplete"),
+            Self::MultipleRoots(_) => write!(f, "MultipleRoots"),
         }
     }
 }
@@ -46,8 +46,8 @@ impl<T> std::fmt::Debug for BuildError<T> {
 impl<T> std::fmt::Display for BuildError<T> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            BuildError::Incomplete(_) => write!(f, "Incomplete tree structure"),
-            BuildError::MultipleRoots(_) => write!(f, "Multiple roots in tree"),
+            Self::Incomplete(_) => write!(f, "Incomplete tree structure"),
+            Self::MultipleRoots(_) => write!(f, "Multiple roots in tree"),
         }
     }
 }
@@ -454,6 +454,12 @@ impl<T> Sapling<T> {
     }
 }
 
+impl<T> Default for Sapling<T> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// A read-only tree data structure.
 ///
 /// Trees are created from [`Sapling`]`<T>`s. Most interactions with trees
@@ -467,6 +473,7 @@ pub struct Tree<T> {
     verts: Vec<Vertex<T>>,
 }
 
+#[allow(clippy::len_without_is_empty)]
 impl<T> Tree<T> {
     /// Returns the unique root node of the tree representing the entire tree.
     ///
@@ -524,6 +531,7 @@ pub struct PolyTree<T> {
     verts: Vec<Vertex<T>>,
 }
 
+#[allow(clippy::len_without_is_empty)]
 impl<T> PolyTree<T> {
     /// Returns an iterator over the root nodes of the poly-tree.
     pub fn roots(&self) -> Children<T> {
@@ -611,7 +619,7 @@ impl<'a, T> Node<'a, T> {
     }
 
     /// Returns `true` if the node has no child nodes.
-    pub fn is_leaf(self) -> bool {
+    pub fn is_empty(self) -> bool {
         self.verts[self.rank].len == 0
     }
 
