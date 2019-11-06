@@ -18,7 +18,7 @@ pub enum BuildError<T> {
     ///
     /// [`is_empty`]: Sapling::is_empty
     /// [`pop_all`]: Sapling::pop_all
-    Incomplete(Sapling<T>),
+    Incomplete(T),
 
     /// The sapling contains more than one root node.
     ///
@@ -31,7 +31,7 @@ pub enum BuildError<T> {
     /// [`build_polytree`]: Sapling::build_polytree
     /// [`pop`]: Sapling::pop
     /// [`push`]: Sapling::push
-    MultipleRoots(Sapling<T>),
+    MultipleRoots(T),
 }
 
 impl<T> std::fmt::Debug for BuildError<T> {
@@ -489,7 +489,7 @@ impl<T> Sapling<T> {
     /// Consumes the sapling in the process. Fails when the sapling is
     /// incomplete or has multiple roots. When failing to build the sapling, the
     /// sapling is returned unmodified with the [`BuildError`]`<T>`.
-    pub fn build(self) -> Result<Tree<T>, BuildError<T>> {
+    pub fn build(self) -> Result<Tree<T>, BuildError<Self>> {
         if !self.is_ready() {
             return Err(BuildError::Incomplete(self));
         }
@@ -508,7 +508,7 @@ impl<T> Sapling<T> {
     /// Consumes the sapling in the process. Fails when the sapling is
     /// incomplete. When failing to build the sapling, the sapling is returned
     /// unmodified with the [`BuildError`]`<T>`.
-    pub fn build_polytree(self) -> Result<PolyTree<T>, BuildError<T>> {
+    pub fn build_polytree(self) -> Result<PolyTree<T>, BuildError<Self>> {
         if !self.is_ready() {
             return Err(BuildError::Incomplete(self));
         }
