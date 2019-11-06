@@ -161,12 +161,13 @@ impl<T> Vertex<T> {
 /// [`pop`]: Sapling::pop
 /// [`push`]: Sapling::push
 #[derive(Debug)]
-pub struct Sapling<T> {
+pub struct Sapling<T, TMP = ()> {
     path: Vec<usize>,
+    path_data: Vec<TMP>,
     verts: Vec<Vertex<T>>,
 }
 
-impl<T> Sapling<T> {
+impl<T> Sapling<T, ()> {
     /// Creates a new empty sapling.
     ///
     /// An empty sapling is not yet ready to be built. Add at least one node
@@ -184,6 +185,7 @@ impl<T> Sapling<T> {
     pub fn new() -> Self {
         Sapling {
             path: Vec::new(),
+            path_data: Vec::new(),
             verts: Vec::new(),
         }
     }
@@ -209,6 +211,28 @@ impl<T> Sapling<T> {
     pub fn with_capacity(len: usize, depth: Option<usize>) -> Self {
         Sapling {
             path: Vec::with_capacity(depth.unwrap_or(0)),
+            path_data: Vec::with_capacity(depth.unwrap_or(0)),
+            verts: Vec::with_capacity(len),
+        }
+    }
+}
+
+impl<T, TMP> Sapling<T, TMP> {
+    /// Creates a new empty sapling with support for temporary values on open
+    /// nodes.
+    pub fn new_with_tmp() -> Self {
+        Sapling {
+            path: Vec::new(),
+            path_data: Vec::new(),
+            verts: Vec::new(),
+        }
+    }
+
+    /// Creates a new empty sapling with the specified capacity.
+    pub fn with_capacity_with_tmp(len: usize, depth: Option<usize>) -> Self {
+        Sapling {
+            path: Vec::with_capacity(depth.unwrap_or(0)),
+            path_data: Vec::with_capacity(depth.unwrap_or(0)),
             verts: Vec::with_capacity(len),
         }
     }
@@ -228,8 +252,22 @@ impl<T> Sapling<T> {
     /// [`pop`]: Sapling::pop
     /// [`push_leaf`]: Sapling::push_leaf
     /// [`push`]: Sapling::push
-    pub fn push(&mut self, data: T) {
+    pub fn push(&mut self, data: T)
+    where
+        TMP: Default,
+    {
         self.path.push(self.verts.len());
+        self.path_data.push(TMP::default());
+        self.verts.push(Vertex { len: 0, data });
+    }
+
+    /// Similar to [`push`] but allows the specification of a temporary value
+    /// that will be stored until the node is closed.
+    ///
+    /// [`push`]: Sapling::push
+    pub fn push_with_tmp(&mut self, data: T, tmp: TMP) {
+        self.path.push(self.verts.len());
+        self.path_data.push(tmp);
         self.verts.push(Vertex { len: 0, data });
     }
 
@@ -251,7 +289,7 @@ impl<T> Sapling<T> {
     /// allows the caller to reuse the trees internal buffers.
     ///
     /// [`push_leaf`]: Sapling::push_leaf
-    pub fn push_tree(&mut self, tree: Tree<T>) -> Sapling<T> {
+    pub fn push_tree<TMP2>(&mut self, tree: Tree<T>) -> Sapling<T, TMP2> {
         let mut sap = tree.into_sapling();
         self.verts.append(&mut sap.verts);
         sap.clear();
@@ -265,7 +303,7 @@ impl<T> Sapling<T> {
     /// allows the caller to reuse the trees internal buffers.
     ///
     /// [`push_leaf`]: Sapling::push_leaf
-    pub fn push_polytree(&mut self, tree: PolyTree<T>) -> Sapling<T> {
+    pub fn push_polytree<TMP2>(&mut self, tree: PolyTree<T>) -> Sapling<T, TMP2> {
         let mut sap = tree.into_sapling();
         self.verts.append(&mut sap.verts);
         sap.clear();
@@ -311,6 +349,18 @@ impl<T> Sapling<T> {
         Some(&self.verts[i].data)
     }
 
+    /// Returns a reference to the payload and temporary value of the currently
+    /// selected node.
+    ///
+    /// The temporary value type defaults to `()`, in this case the simpler
+    /// method `peek` can be used instead.
+    ///
+    /// [`peek`]: Sapling::peek
+    pub fn peek_with_tmp(&self) -> Option<(&T, &TMP)> {
+        let i = *self.path.last()?;
+        Some((&self.verts[i].data, self.path_data.last().unwrap()))
+    }
+
     /// Returns a mutable reference to the payload of the selected node. Returns
     /// `None` if no node is currently selected; this happens when the sapling
     /// is empty or after a root node was closed.
@@ -336,6 +386,13 @@ impl<T> Sapling<T> {
     pub fn peek_mut(&mut self) -> Option<&mut T> {
         let i = *self.path.last()?;
         Some(&mut self.verts[i].data)
+    }
+
+    /// Returns mutable references to the payload and temporary value of the
+    /// currently selected node.
+    pub fn peek_mut_with_tmp(&mut self) -> Option<(&mut T, &mut TMP)> {
+        let i = *self.path.last()?;
+        Some((&mut self.verts[i].data, self.path_data.last_mut().unwrap()))
     }
 
     /// Closes the selected node.
@@ -367,8 +424,29 @@ impl<T> Sapling<T> {
     /// ```
     pub fn pop(&mut self) -> Option<&mut T> {
         let i = self.path.pop()?;
+        self.path_data.pop();
+
         self.verts[i].len = self.verts.len() - i - 1;
         Some(&mut self.verts[i].data)
+    }
+
+    /// Closes the selected node and returns a mutable reference to its payload
+    /// and its temporary value. Temporary values are only stored in the sapling
+    /// until their node is closed.
+    ///
+    /// Use [std::mem::replace] to replace the value of the payload with a new
+    /// value.
+    ///
+    /// If the temporary value is not of interest, the simpler version `pop` can
+    /// be used instead.
+    ///
+    /// [`pop`]: Sapling::pop
+    pub fn pop_with_tmp(&mut self) -> Option<(&mut T, TMP)> {
+        let i = self.path.pop()?;
+        let tmp = self.path_data.pop().unwrap();
+
+        self.verts[i].len = self.verts.len() - i - 1;
+        Some((&mut self.verts[i].data, tmp))
     }
 
     /// Closes all open nodes.
@@ -390,6 +468,7 @@ impl<T> Sapling<T> {
         while let Some(i) = self.path.pop() {
             self.verts[i].len = self.verts.len() - i - 1;
         }
+        self.path_data.clear();
     }
 
     /// Closes the current node and makes it a leaf node.
@@ -420,6 +499,8 @@ impl<T> Sapling<T> {
     /// ```
     pub fn pop_as_leaf(&mut self) -> Option<&T> {
         let i = self.path.pop()?;
+        self.path_data.pop();
+
         Some(&self.verts[i].data)
     }
 
@@ -445,6 +526,7 @@ impl<T> Sapling<T> {
     /// ```
     pub fn pop_as_leaf_all(&mut self) {
         self.path.clear();
+        self.path_data.clear();
     }
 
     /// Removes all nodes from the sapling, making it empty.
@@ -463,6 +545,7 @@ impl<T> Sapling<T> {
     /// ```
     pub fn clear(&mut self) {
         self.path.clear();
+        self.path_data.clear();
         self.verts.clear();
     }
 
@@ -584,9 +667,10 @@ impl<T> Tree<T> {
     /// is the validation that occurs during [`build`].
     ///
     /// [`build`]: Sapling::build
-    pub fn into_sapling(self) -> Sapling<T> {
+    pub fn into_sapling<TMP>(self) -> Sapling<T, TMP> {
         Sapling {
             path: self.path,
+            path_data: Vec::new(),
             verts: self.verts,
         }
     }
@@ -597,6 +681,10 @@ impl<T> Tree<T> {
 /// Similar to [`Tree`]`<T>` but allows multiple root nodes.
 #[derive(Debug)]
 pub struct PolyTree<T> {
+    /// Unused buffer.
+    ///
+    /// The buffer was used by the sapling that was used to construct the tree.
+    /// It is kept in case the tree is turned back into a sapling.
     path: Vec<usize>,
     verts: Vec<Vertex<T>>,
 }
@@ -641,9 +729,10 @@ impl<T> PolyTree<T> {
     /// forth is the validation that occurs during [`build_polytree`].
     ///
     /// [`build_polytree`]: Sapling::build_polytree
-    pub fn into_sapling(self) -> Sapling<T> {
+    pub fn into_sapling<TMP>(self) -> Sapling<T, TMP> {
         Sapling {
             path: self.path,
+            path_data: Vec::new(),
             verts: self.verts,
         }
     }
