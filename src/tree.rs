@@ -298,10 +298,10 @@ impl<T> Sapling<T> {
     /// sap.push(1);
     ///
     /// assert_eq!(sap.peek(), Some(&1));
-    /// assert_eq!(sap.pop(), Some(&1));
+    /// assert_eq!(sap.pop(), Some(&mut 1));
     ///
     /// assert_eq!(sap.peek(), Some(&0));
-    /// assert_eq!(sap.pop(), Some(&0));
+    /// assert_eq!(sap.pop(), Some(&mut 0));
     ///
     /// assert_eq!(sap.peek(), None);
     /// assert_eq!(sap.pop(), None);
@@ -309,6 +309,33 @@ impl<T> Sapling<T> {
     pub fn peek(&self) -> Option<&T> {
         let i = *self.path.last()?;
         Some(&self.verts[i].data)
+    }
+
+    /// Returns a mutable reference to the payload of the selected node. Returns
+    /// `None` if no node is currently selected; this happens when the sapling
+    /// is empty or after a root node was closed.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use read_tree::Sapling;
+    ///
+    /// let mut sap = Sapling::new();
+    /// sap.push(0);
+    /// sap.push(1);
+    ///
+    /// assert_eq!(sap.peek_mut(), Some(&mut 1));
+    /// assert_eq!(sap.pop(), Some(&mut 1));
+    ///
+    /// assert_eq!(sap.peek_mut(), Some(&mut 0));
+    /// assert_eq!(sap.pop(), Some(&mut 0));
+    ///
+    /// assert_eq!(sap.peek_mut(), None);
+    /// assert_eq!(sap.pop(), None);
+    /// ```
+    pub fn peek_mut(&mut self) -> Option<&mut T> {
+        let i = *self.path.last()?;
+        Some(&mut self.verts[i].data)
     }
 
     /// Closes the selected node.
@@ -327,7 +354,7 @@ impl<T> Sapling<T> {
     ///
     /// let mut sap = Sapling::new();
     /// sap.push(0);
-    /// assert_eq!(sap.pop(), Some(&0));
+    /// assert_eq!(sap.pop(), Some(&mut 0));
     ///
     /// assert!(sap.is_ready());
     /// ```
@@ -338,10 +365,10 @@ impl<T> Sapling<T> {
     /// let mut sap = Sapling::<usize>::new();
     /// assert_eq!(sap.pop(), None);
     /// ```
-    pub fn pop(&mut self) -> Option<&T> {
+    pub fn pop(&mut self) -> Option<&mut T> {
         let i = self.path.pop()?;
         self.verts[i].len = self.verts.len() - i - 1;
-        Some(&self.verts[i].data)
+        Some(&mut self.verts[i].data)
     }
 
     /// Closes all open nodes.
