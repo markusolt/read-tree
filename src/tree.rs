@@ -315,8 +315,8 @@ impl<'a, T> Node<'a, T> {
     /// Returns the [`Scope`] of the node.
     ///
     /// [`Scope`]: crate::vocab::Scope
-    pub fn scope(self) -> (usize, usize) {
-        (self.index(), self.index() + self.len())
+    pub fn scope(self) -> std::ops::RangeInclusive<usize> {
+        self.index()..=self.index() + self.len()
     }
 
     /// Returns the number of descending nodes within the subtree of this node.

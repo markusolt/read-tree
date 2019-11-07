@@ -5,7 +5,7 @@ use crate::Node;
 /// The range of [`Indices`] of a [`Node`] and its [`Descendants`].
 ///
 /// The scope of a node is the inclusive range `self.index()..=self.index() +
-/// self.len()` or `self.scope().0..=self.scope().1`.
+/// self.len()`.
 ///
 /// Because of the internal ordering of indices, nodes with an index within this
 /// range are either the node itself or a descendant of the node.
@@ -21,14 +21,14 @@ use crate::Node;
 ///
 /// // The node with index `1` is a leaf node.
 /// // Its scope is `1..=1`.
-/// assert_eq!(tree.get(1).unwrap().scope(), (1, 1));
+/// assert_eq!(tree.get(1).unwrap().scope(), 1..=1);
 ///
 /// // The node with index `2` contains a large subtree.
 /// // The last descendant has index `7`.
-/// assert_eq!(tree.get(2).unwrap().scope(), (2, 7));
+/// assert_eq!(tree.get(2).unwrap().scope(), 2..=7);
 ///
-/// // The trees root node always spans the entire tree `0..=tree.len() - 1`.
-/// assert_eq!(tree.as_node().scope(), (0, tree.len() - 1));
+/// // The trees root node always spans the entire tree `0..tree.len()`.
+/// assert_eq!(tree.as_node().scope(), 0..=tree.len() - 1);
 /// ```
 ///
 /// [`Descendants`]: crate::Descendants
@@ -51,7 +51,7 @@ impl Scope {
 impl<'a, T> From<Node<'a, T>> for Scope {
     fn from(node: Node<T>) -> Self {
         Scope {
-            range: node.scope(),
+            range: node.scope().into_inner(),
         }
     }
 }
@@ -96,8 +96,8 @@ impl<'a, T> From<Node<'a, T>> for Scope {
 ///
 /// // All nodes with index within the scope are the original node and its descendants.
 /// let scope = tree.get(4).unwrap().scope();
-/// assert_eq!(scope, (4, 6));
-/// assert!((scope.0..=scope.1)
+/// assert_eq!(scope, 4..=6);
+/// assert!(scope
 ///     .map(|i| tree.get(i).unwrap().data().to_string())
 ///     .all(|s| s.starts_with("122")));
 /// ```

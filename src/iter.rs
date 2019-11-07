@@ -140,7 +140,7 @@ impl<'a, T> From<Node<'a, T>> for Children<'a, T> {
     fn from(node: Node<'a, T>) -> Self {
         Children {
             front: node.index() + 1,
-            back: node.scope().1 + 1,
+            back: node.scope().end() + 1,
             branch: node.into(),
         }
     }

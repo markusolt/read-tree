@@ -47,49 +47,49 @@ mod test {
         let node = iter.next().unwrap();
         assert_eq!(node.index(), 0);
         assert_eq!(node.len(), 7);
-        assert_eq!(node.scope(), (0, 7));
+        assert_eq!(node.scope(), 0..=7);
         assert_eq!(node.data(), &1);
 
         let node = iter.next().unwrap();
         assert_eq!(node.index(), 1);
         assert_eq!(node.len(), 0);
-        assert_eq!(node.scope(), (1, 1));
+        assert_eq!(node.scope(), 1..=1);
         assert_eq!(node.data(), &11);
 
         let node = iter.next().unwrap();
         assert_eq!(node.index(), 2);
         assert_eq!(node.len(), 5);
-        assert_eq!(node.scope(), (2, 7));
+        assert_eq!(node.scope(), 2..=7);
         assert_eq!(node.data(), &12);
 
         let node = iter.next().unwrap();
         assert_eq!(node.index(), 3);
         assert_eq!(node.len(), 0);
-        assert_eq!(node.scope(), (3, 3));
+        assert_eq!(node.scope(), 3..=3);
         assert_eq!(node.data(), &121);
 
         let node = iter.next().unwrap();
         assert_eq!(node.index(), 4);
         assert_eq!(node.len(), 2);
-        assert_eq!(node.scope(), (4, 6));
+        assert_eq!(node.scope(), 4..=6);
         assert_eq!(node.data(), &122);
 
         let node = iter.next().unwrap();
         assert_eq!(node.index(), 5);
         assert_eq!(node.len(), 0);
-        assert_eq!(node.scope(), (5, 5));
+        assert_eq!(node.scope(), 5..=5);
         assert_eq!(node.data(), &1221);
 
         let node = iter.next().unwrap();
         assert_eq!(node.index(), 6);
         assert_eq!(node.len(), 0);
-        assert_eq!(node.scope(), (6, 6));
+        assert_eq!(node.scope(), 6..=6);
         assert_eq!(node.data(), &1222);
 
         let node = iter.next().unwrap();
         assert_eq!(node.index(), 7);
         assert_eq!(node.len(), 0);
-        assert_eq!(node.scope(), (7, 7));
+        assert_eq!(node.scope(), 7..=7);
         assert_eq!(node.data(), &123);
 
         assert!(iter.next().is_none());
