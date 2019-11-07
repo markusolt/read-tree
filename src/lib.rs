@@ -49,12 +49,15 @@
 //! [`push_leaf`]: Sapling::push_leaf
 //! [`push`]: Sapling::push
 
+mod iter;
+mod sapling;
 mod tree;
+
+pub mod demo;
+pub mod vocab;
+pub use iter::{Ancestors, Children, Descendants};
+pub use sapling::{BuildError, Sapling};
+pub use tree::{Branch, Node, PolyTree, Tree, ValidationError, Vertex};
 
 #[cfg(test)]
 mod test;
-
-pub use tree::{
-    Ancestors, BuildError, Children, Descendants, Node, PolyTree, Sapling, Tree, ValidationError,
-    Vertex,
-};

@@ -2,6 +2,32 @@
 
 A rust library for creating and then navigating read-only trees.
 
+# TODO
+
+- comparing nodes?
+- document iterators
+- document saplings
+- rewrite tree.rs
+- move tests into modules
+- add more tests
+- update lib level documentation
+- update readme
+- link read-xml in readme
+- document more vocab
+    - BuildError
+    - Index (Rank)
+    - Node
+    - Payload
+    - PolyTree
+    - Sapling
+    - Scope
+    - Tree
+    - ValidationError
+    - Vertex
+    - Vertex.Length
+    - Assembler
+
+
 # Usage
 
 Add the following to your `cargo.toml` file.
