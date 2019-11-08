@@ -54,7 +54,9 @@ mod sapling;
 mod tree;
 
 pub mod demo;
+pub mod error;
 pub mod vocab;
+
 pub use iter::{Ancestors, Children, Descendants};
 pub use sapling::{BuildError, Sapling};
 pub use tree::{Branch, Node, PolyTree, Tree, ValidationError, Vertex};

@@ -1,5 +1,6 @@
 //! Builder for [`Tree`]s.
 
+use crate::error::ErrorWith;
 use crate::tree::{Node, PolyTree, Tree, Vertex};
 
 /// Builder for [`Tree`]s.
@@ -216,15 +217,15 @@ impl<T, ASM> Sapling<T, ASM> {
     ///
     /// Consumes the sapling in the process. On failure returns a [`BuildError`]
     /// containing the unmodified sapling.
-    pub fn build(self) -> Result<Tree<T>, BuildError<T, ASM>> {
+    pub fn build(self) -> Result<Tree<T>, ErrorWith<BuildError, Sapling<T, ASM>>> {
         if self.is_empty() {
-            return Err(BuildError::Empty(self));
+            return Err(ErrorWith::new(BuildError::Empty, self));
         }
         if !self.is_complete() {
-            return Err(BuildError::Incomplete(self));
+            return Err(ErrorWith::new(BuildError::Incomplete, self));
         }
         if self.verts[0].len != self.verts.len() - 1 {
-            return Err(BuildError::MultipleRoots(self));
+            return Err(ErrorWith::new(BuildError::MultipleRoots, self));
         }
 
         Ok(Tree {
@@ -237,12 +238,12 @@ impl<T, ASM> Sapling<T, ASM> {
     ///
     /// Consumes the sapling in the process. On failure returns a [`BuildError`]
     /// containing the unmodified sapling.
-    pub fn build_polytree(self) -> Result<PolyTree<T>, BuildError<T, ASM>> {
+    pub fn build_polytree(self) -> Result<PolyTree<T>, ErrorWith<BuildError, Sapling<T, ASM>>> {
         if self.is_empty() {
-            return Err(BuildError::Empty(self));
+            return Err(ErrorWith::new(BuildError::Empty, self));
         }
         if !self.is_complete() {
-            return Err(BuildError::Incomplete(self));
+            return Err(ErrorWith::new(BuildError::Incomplete, self));
         }
 
         Ok(PolyTree {
@@ -291,38 +292,32 @@ where
 
 /// An error when building [`Sapling`]s into [`Tree`]s.
 ///
-/// The error variants carry the sapling that caused the failure. The sapling
-/// can then be updated and built again.
+/// The error is usually returned inside a [`ErrorWith`]`<`[`BuildError`]`,
+/// `[`Sapling`]<T, ASM>>`. This allows the caller of [`build`] to retake
+/// ownership over the sapling when building fails.
+///
+/// [`build`]: Sapling::build
 #[non_exhaustive]
-pub enum BuildError<T, ASM> {
+#[derive(Debug)]
+pub enum BuildError {
     /// The sapling is empty.
-    Empty(Sapling<T, ASM>),
+    Empty,
 
     /// The sapling contains open nodes.
-    Incomplete(Sapling<T, ASM>),
+    Incomplete,
 
     /// The sapling contains more than one root node.
-    MultipleRoots(Sapling<T, ASM>),
+    MultipleRoots,
 }
 
-impl<T, ASM> std::fmt::Debug for BuildError<T, ASM> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+impl fmt::Display for BuildError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            Self::Empty(_) => write!(f, "Empty"),
-            Self::Incomplete(_) => write!(f, "Incomplete"),
-            Self::MultipleRoots(_) => write!(f, "MultipleRoots"),
+            Self::Empty => write!(f, "The sapling is empty"),
+            Self::Incomplete => write!(f, "The sapling contains unclosed nodes"),
+            Self::MultipleRoots => write!(f, "The sapling contains more than one root node"),
         }
     }
 }
 
-impl<T, ASM> std::fmt::Display for BuildError<T, ASM> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Self::Empty(_) => write!(f, "The sapling is empty"),
-            Self::Incomplete(_) => write!(f, "The sapling contains unclosed nodes"),
-            Self::MultipleRoots(_) => write!(f, "The sapling contains more than one root node"),
-        }
-    }
-}
-
-impl<T, ASM> std::error::Error for BuildError<T, ASM> {}
+impl std::error::Error for BuildError {}
