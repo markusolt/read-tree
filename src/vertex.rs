@@ -16,7 +16,10 @@
 /// [`Vec::extend_from_slice`] executes as fast as possible. This method is used
 /// by [`Sapling::push_tree`] to copy the nodes of a tree into another sapling.
 ///
+/// [`Node`]: crate::Node
+/// [`PolyTree`]: crate::PolyTree
 /// [`Sapling::push_tree`]: crate::Sapling::push_tree
+/// [`Tree`]: crate::Tree
 #[derive(Debug, Clone, Copy)]
 pub struct Vertex<T> {
     pub data: T,

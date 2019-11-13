@@ -75,8 +75,8 @@ use std::convert::TryInto;
 /// [`Trees`]: Tree
 #[derive(Debug, Clone)]
 pub struct Sapling<T, ASM = ()> {
-    open: Vec<(usize, ASM)>,
-    verts: Vec<Vertex<T>>,
+    pub(crate) open: Vec<(usize, ASM)>,
+    pub(crate) verts: Vec<Vertex<T>>,
 }
 
 impl<T> Sapling<T> {
@@ -124,7 +124,7 @@ impl<T, ASM> Sapling<T, ASM> {
         self.verts.clear();
     }
 
-    pub fn verts(&self) -> &[Vertex<T>] {
+    pub fn as_slice(&self) -> &[Vertex<T>] {
         &self.verts[..]
     }
 
@@ -202,7 +202,7 @@ impl<T, ASM> Sapling<T, ASM> {
         if !self.is_complete() {
             return Err(BuildError::Incomplete);
         }
-        if self.verts()[0].len != self.verts().len() - 1 {
+        if self.verts[0].len != self.verts.len() - 1 {
             return Err(BuildError::MultipleRoots);
         }
 
@@ -254,7 +254,7 @@ impl<T, ASM> Sapling<T, ASM> {
     where
         T: Clone,
     {
-        self.verts.extend_from_slice(node.verts());
+        self.verts.extend_from_slice(node.as_slice());
     }
 
     pub fn peek(&self) -> Option<&T> {

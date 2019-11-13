@@ -12,7 +12,7 @@ impl<T, ASM> PolyTree<T, ASM> {
     }
 
     pub fn verts(&self) -> &[Vertex<T>] {
-        self.sap.verts()
+        self.sap.as_slice()
     }
 }
 

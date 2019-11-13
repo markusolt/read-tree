@@ -14,12 +14,12 @@ use std::fmt;
 /// error type `E` implements them as well. The payload `T` does not need to
 /// support any traits.
 ///
-/// When the struct is printed it prints its payload `val: T` as `"val: [...]"`;
+/// When the struct is printed it prints its payload `val` as `"val: [...]"`;
 /// that is to say the value of type `T` is always printed as `[...]`. This
 /// prevents filling the output with unwanted information and allows printing of
 /// types `T` that do not implement [`Debug`].
 ///
-/// Similarly [`Display`] is implemented to only include the value of `err: E`.1
+/// Similarly [`Display`] is implemented to only print the value of `err`.
 ///
 /// # Examples
 ///
@@ -32,7 +32,7 @@ use std::fmt;
 /// let mut sap = Sapling::<()>::new();
 /// // [...]
 ///
-/// // Try to build the sapling but return it as a sapling.
+/// // Try to build the sapling and return it on error.
 /// sap = match sap.build() {
 ///     Ok(tree) => {
 ///         println!("Sapling built successfully.");
@@ -162,9 +162,10 @@ impl<E, T> error::Error for ErrorWith<E, T> where E: error::Error {}
 /// assert_eq!(sap.build().unwrap_err().err(), &BuildError::MultipleRoots);
 /// ```
 ///
-/// [`build`]: Sapling::build
-/// [`Saplings`]: Sapling
-/// [`Trees`]: Tree
+/// [`build`]: crate::Sapling::build
+/// [`Sapling`]: crate::Sapling
+/// [`Saplings`]: crate::Sapling
+/// [`Trees`]: crate::Tree
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum BuildError {
     /// The sapling is empty.
@@ -179,8 +180,10 @@ pub enum BuildError {
     /// [`Tree`]. When this error occurs it is safe to build the sapling into a
     /// [`PolyTree`] instead. See [`build_polytree`].
     ///
-    /// [`build_polytree`]: Sapling::build_polytree
-    /// [`build`]: Sapling::build
+    /// [`build_polytree`]: crate::Sapling::build_polytree
+    /// [`build`]: crate::Sapling::build
+    /// [`PolyTree`]: crate::PolyTree
+    /// [`Tree`]: crate::Tree
     MultipleRoots,
 }
 

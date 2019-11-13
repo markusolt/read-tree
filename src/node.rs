@@ -96,8 +96,8 @@ impl<'a, T> Node<'a, T> {
     }
 
     /// Returns the internal slice of [`Vertices`][Vertex].
-    pub fn verts(self) -> &'a [Vertex<T>] {
-        &self.verts[self.index()..=self.index() + self.len()]
+    pub fn as_slice(self) -> &'a [Vertex<T>] {
+        &self.verts[..]
     }
 
     /// Returns the node with the specified `index`.
@@ -159,7 +159,7 @@ impl<'a, T, ASM> From<&'a Tree<T, ASM>> for Node<'a, T> {
     fn from(tree: &'a Tree<T, ASM>) -> Self {
         Node {
             index: 0,
-            verts: tree.verts(),
+            verts: tree.as_slice(),
         }
     }
 }
@@ -168,13 +168,13 @@ impl<'a, T> TryFrom<Branch<'a, T>> for Node<'a, T> {
     type Error = ValidationError;
 
     fn try_from(branch: Branch<'a, T>) -> Result<Self, Self::Error> {
-        if branch.verts()[0].len != branch.len() + 1 {
+        if branch.as_slice()[0].len + 1 != branch.len() {
             return Err(ValidationError::MultipleRoots);
         }
 
         Ok(Node {
             index: 0,
-            verts: branch.verts(),
+            verts: branch.as_slice(),
         })
     }
 }

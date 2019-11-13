@@ -28,7 +28,7 @@ use crate::{Branch, Node, PolyTree, Tree};
 /// [`Nodes`]: crate::Node
 /// [`rev`]: Iterator::rev
 /// [`Tree`]: crate::Tree
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Ancestors<'a, T> {
     /// The [`Index`] of the last yielded node from the front.
     ///
@@ -103,6 +103,14 @@ impl<'a, T> DoubleEndedIterator for Ancestors<'a, T> {
     }
 }
 
+impl<'a, T> Copy for Ancestors<'a, T> {}
+
+impl<'a, T> Clone for Ancestors<'a, T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
 /// The [`Nodes`] that have a particular node as a parent.
 ///
 /// Children of a node can be iterated over. The iteration supports no special
@@ -126,7 +134,7 @@ impl<'a, T> DoubleEndedIterator for Ancestors<'a, T> {
 ///
 /// [`Nodes`]: crate::Node
 /// [`size_hint`]: Iterator::size_hint
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Children<'a, T> {
     /// The [`Index`] of the next child node.
     ///
@@ -192,6 +200,14 @@ impl<'a, T> Iterator for Children<'a, T> {
     }
 }
 
+impl<'a, T> Copy for Children<'a, T> {}
+
+impl<'a, T> Clone for Children<'a, T> {
+    fn clone(&self) -> Self {
+        *self
+    }
+}
+
 /// The [`Nodes`] of the subtree underneath a node.
 ///
 /// The descendants of a node are its children and the children of its
@@ -218,7 +234,7 @@ impl<'a, T> Iterator for Children<'a, T> {
 /// ```
 ///
 /// [`Nodes`]: crate::Node
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Descendants<'a, T> {
     /// The [`Index`] of the next node to yield from the front.
     ///
@@ -317,5 +333,13 @@ impl<'a, T> DoubleEndedIterator for Descendants<'a, T> {
 impl<'a, T> ExactSizeIterator for Descendants<'a, T> {
     fn len(&self) -> usize {
         self.back - self.front
+    }
+}
+
+impl<'a, T> Copy for Descendants<'a, T> {}
+
+impl<'a, T> Clone for Descendants<'a, T> {
+    fn clone(&self) -> Self {
+        *self
     }
 }
