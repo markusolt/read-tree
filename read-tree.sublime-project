@@ -8,7 +8,7 @@
     "build_systems": [
         {
             "name": "cargo check",
-            "shell_cmd": "cargo check --message-format=short && cargo check --tests --message-format=short && cargo fmt && cargo doc --message-format=short",
+            "shell_cmd": "cargo check --message-format=short && cargo fmt",
             "working_dir": "$project_path/",
             "file_regex": "^([^:]+):(\\d+):(\\d+): (.+)$"
         }

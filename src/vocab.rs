@@ -17,18 +17,22 @@ use crate::Node;
 /// scope `0..tree.len()`.
 ///
 /// ```rust
-/// let tree = read_tree::demo::small_tree();
+/// || -> Option<()> {
+///     let tree = read_tree::demo::small_tree();
 ///
-/// // The node with index `1` is a leaf node.
-/// // Its scope is `1..=1`.
-/// assert_eq!(tree.get(1).unwrap().scope(), 1..=1);
+///     // The node with index `1` is a leaf node.
+///     // Its scope is `1..=1`.
+///     assert_eq!(tree.get(1)?.scope(), 1..=1);
 ///
-/// // The node with index `2` contains a large subtree.
-/// // The last descendant has index `7`.
-/// assert_eq!(tree.get(2).unwrap().scope(), 2..=7);
+///     // The node with index `2` contains a large subtree.
+///     // The last descendant has index `7`.
+///     assert_eq!(tree.get(2)?.scope(), 2..=7);
 ///
-/// // The trees root node always spans the entire tree `0..tree.len()`.
-/// assert_eq!(tree.as_node().scope(), 0..=tree.len() - 1);
+///     // The trees root node always spans the entire tree `0..tree.len()`.
+///     assert_eq!(tree.as_node().scope(), 0..=tree.len() - 1);
+///
+///     Some(())
+/// }();
 /// ```
 ///
 /// [`Descendants`]: crate::Descendants
@@ -86,20 +90,24 @@ impl<'a, T> From<Node<'a, T>> for Scope {
 /// includes the index of the node itself.
 ///
 /// ```rust
-/// let tree = read_tree::demo::small_tree();
+/// || -> Option<()> {
+///     let tree = read_tree::demo::small_tree();
 ///
-/// assert_eq!(tree.get(0).unwrap().data(), &1);
-/// assert_eq!(tree.get(1).unwrap().data(), &11);
-/// assert_eq!(tree.get(2).unwrap().data(), &12);
-/// assert_eq!(tree.get(3).unwrap().data(), &121);
-/// // ...
+///     assert_eq!(tree.get(0)?.data(), &1);
+///     assert_eq!(tree.get(1)?.data(), &11);
+///     assert_eq!(tree.get(2)?.data(), &12);
+///     assert_eq!(tree.get(3)?.data(), &121);
+///     // ...
 ///
-/// // All nodes with index within the scope are the original node and its descendants.
-/// let scope = tree.get(4).unwrap().scope();
-/// assert_eq!(scope, 4..=6);
-/// assert!(scope
-///     .map(|i| tree.get(i).unwrap().data().to_string())
-///     .all(|s| s.starts_with("122")));
+///     // All nodes with index within the scope are the original node and its descendants.
+///     let scope = tree.get(4)?.scope();
+///     assert_eq!(scope, 4..=6);
+///     assert!(scope
+///         .map(|i| tree.get(i).unwrap().data().to_string())
+///         .all(|s| s.starts_with("122")));
+///
+///     Some(())
+/// }();
 /// ```
 ///
 /// We now show how indexing works on nodes. Nodes use the same indices as their
@@ -112,15 +120,19 @@ impl<'a, T> From<Node<'a, T>> for Scope {
 /// fail to leave the bounds of the isolation.
 ///
 /// ```rust
-/// let tree = read_tree::demo::small_tree();
+/// || -> Option<()> {
+///     let tree = read_tree::demo::small_tree();
 ///
-/// let node = tree.get(5).unwrap();
-/// assert_eq!(node.get(0).unwrap().data(), &1);
-/// assert_eq!(node.get(7).unwrap().data(), &123);
+///     let node = tree.get(5)?;
+///     assert_eq!(node.get(0)?.data(), &1);
+///     assert_eq!(node.get(7)?.data(), &123);
 ///
-/// let node = node.isolated();
-/// assert_eq!(node.get(0).unwrap().data(), node.data());
-/// assert!(node.get(1).is_none());
+///     let node = node.isolated();
+///     assert_eq!(node.get(0)?.data(), node.data());
+///     assert!(node.get(1).is_none());
+///
+///     Some(())
+/// }();
 /// ```
 ///
 /// [`Descendant`]: crate::Descendants

@@ -5,7 +5,7 @@ use crate::{Sapling, Tree};
 /// Returns a small [`Tree`].
 ///
 /// This function is used throughout the examples within this crate. It always
-/// returns the same tree. The tree has `8` nodes as they are drawn below.
+/// returns the same tree. The tree has `8` [`Nodes`] as they are drawn below.
 ///
 /// ```text
 /// (0) - 1
@@ -17,6 +17,9 @@ use crate::{Sapling, Tree};
 /// (6)             - 1222
 /// (7)         - 123
 /// ```
+///
+/// [`Nodes`]: crate::Node
+/// [`Tree`]: crate::Tree
 pub fn small_tree() -> Tree<usize> {
     let mut sap = Sapling::new();
 

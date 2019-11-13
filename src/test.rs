@@ -96,24 +96,27 @@ mod test_node {
     #[test]
     fn test_from() {
         let tree = small();
-        Node::from(tree.as_node().as_slice()).unwrap();
+        Node::from_slice(tree.as_node().as_slice()).unwrap();
 
-        Node::from(&[Vertex::new((), 0)]).unwrap();
-        assert_eq!(Node::<()>::from(&[]).unwrap_err(), ValidationError::Empty);
+        Node::from_slice(&[Vertex::new((), 0)]).unwrap();
         assert_eq!(
-            Node::from(&[Vertex::new((), 0), Vertex::new((), 0)]).unwrap_err(),
+            Node::<()>::from_slice(&[]).unwrap_err(),
+            ValidationError::Empty
+        );
+        assert_eq!(
+            Node::from_slice(&[Vertex::new((), 0), Vertex::new((), 0)]).unwrap_err(),
             ValidationError::MultipleRoots
         );
         assert_eq!(
-            Node::from(&[Vertex::new((), 1)]).unwrap_err(),
+            Node::from_slice(&[Vertex::new((), 1)]).unwrap_err(),
             ValidationError::MultipleRoots
         );
         assert_eq!(
-            Node::from(&[Vertex::new((), 1), Vertex::new((), 1)]).unwrap_err(),
+            Node::from_slice(&[Vertex::new((), 1), Vertex::new((), 1)]).unwrap_err(),
             ValidationError::IllegalStructure
         );
         assert_eq!(
-            Node::from(&[
+            Node::from_slice(&[
                 Vertex::new((), 3),
                 Vertex::new((), 1),
                 Vertex::new((), 1),

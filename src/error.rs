@@ -89,6 +89,26 @@ impl<E, T> ErrorWith<E, T> {
     }
 
     /// Consumes the `ErrorWith` and returns ownership of the payload.
+    ///
+    /// # Examples
+    ///
+    /// The following example attempts to build a [`Sapling`] into a [`Tree`],
+    /// then returns the original sapling. Notice that `sap` is moved into
+    /// [`build`].
+    ///
+    /// ```rust
+    /// use read_tree::Sapling;
+    ///
+    /// let mut sap = Sapling::<()>::new();
+    /// sap = match sap.build() {
+    ///     Ok(tree) => tree.into(),
+    ///     Err(err) => err.into_inner(),
+    /// }
+    /// ```
+    ///
+    /// [`Sapling`]: crate::Sapling
+    /// [`Tree`]: crate::Tree
+    /// [`build`]: crate::Sapling::build
     pub fn into_inner(self) -> T {
         self.val
     }
@@ -116,3 +136,93 @@ where
 }
 
 impl<E, T> error::Error for ErrorWith<E, T> where E: error::Error {}
+
+/// An error when building [`Saplings`] into [`Trees`].
+///
+/// The error is usually contained in a [`ErrorWith`]`<`[`BuildError`]`,
+/// `[`Sapling`]`<T, ASM>>`. The caller of methods like [`build`] can then
+/// retake ownership over the sapling.
+///
+/// # Examples
+///
+/// ```rust
+/// use read_tree::BuildError;
+/// use read_tree::Sapling;
+///
+/// let mut sap = Sapling::<()>::new();
+/// assert_eq!(sap.build().unwrap_err().err(), &BuildError::Empty);
+///
+/// let mut sap = Sapling::new();
+/// sap.push(());
+/// assert_eq!(sap.build().unwrap_err().err(), &BuildError::Incomplete);
+///
+/// let mut sap = Sapling::new();
+/// sap.push_leaf(());
+/// sap.push_leaf(());
+/// assert_eq!(sap.build().unwrap_err().err(), &BuildError::MultipleRoots);
+/// ```
+///
+/// [`build`]: Sapling::build
+/// [`Saplings`]: Sapling
+/// [`Trees`]: Tree
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum BuildError {
+    /// The sapling is empty.
+    Empty,
+
+    /// The sapling contains open nodes.
+    Incomplete,
+
+    /// The sapling contains more than one root node.
+    ///
+    /// This error only occurs when attempting to [`build`] a sapling into a
+    /// [`Tree`]. When this error occurs it is safe to build the sapling into a
+    /// [`PolyTree`] instead. See [`build_polytree`].
+    ///
+    /// [`build_polytree`]: Sapling::build_polytree
+    /// [`build`]: Sapling::build
+    MultipleRoots,
+}
+
+impl fmt::Display for BuildError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::Empty => write!(f, "The sapling is empty"),
+            Self::Incomplete => write!(f, "The sapling contains unclosed nodes"),
+            Self::MultipleRoots => write!(f, "The sapling contains more than one root node"),
+        }
+    }
+}
+
+impl std::error::Error for BuildError {}
+
+/// An error returned when validating a vertex slice.
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub enum ValidationError {
+    /// The vertex slice is empty.
+    ///
+    /// Nodes must always have exactly one root. The buffer therefor needs to
+    /// have at least one entry.
+    Empty,
+
+    /// The vertex slice contains more than one root node.
+    ///
+    /// Nodes can only have exactly one root node.
+    MultipleRoots,
+
+    /// Some of the lengths of the vertices do not match up. Ensure a vertex
+    /// does not have more descendants than its ancestors.
+    IllegalStructure,
+}
+
+impl std::fmt::Display for ValidationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::Empty => write!(f, "Empty vertex slice"),
+            Self::MultipleRoots => write!(f, "Multiple roots in vertex slice"),
+            Self::IllegalStructure => write!(f, "Vertex with invalid length"),
+        }
+    }
+}
+
+impl std::error::Error for ValidationError {}

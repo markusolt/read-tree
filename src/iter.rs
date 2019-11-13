@@ -1,8 +1,6 @@
-//! Iterators on nodes.
+use crate::{Branch, Node, PolyTree, Tree};
 
-use crate::tree::{Branch, Node, PolyTree, Tree};
-
-/// The [`Node`]s that contain a particular node.
+/// The [`Nodes`] that contain a particular node.
 ///
 /// The ancestors of a node are its parent and the parents of its ancestors.
 ///
@@ -15,11 +13,19 @@ use crate::tree::{Branch, Node, PolyTree, Tree};
 /// # Examples
 ///
 /// ```rust
-/// fn main() -> Result<(), Box<dyn std::error::Error>> {
-///     Ok(())
-/// }
+/// || -> Option<()> {
+///     let tree = read_tree::demo::small_tree();
+///     let mut ancestors = tree.get(5)?.ancestors();
+///
+///     assert_eq!(ancestors.next()?.data(), &122);
+///     assert_eq!(ancestors.next()?.data(), &12);
+///     assert_eq!(ancestors.next()?.data(), &1);
+///
+///     Some(())
+/// }();
 /// ```
 ///
+/// [`Nodes`]: crate::Node
 /// [`rev`]: Iterator::rev
 /// [`Tree`]: crate::Tree
 #[derive(Debug, Clone)]
@@ -97,7 +103,7 @@ impl<'a, T> DoubleEndedIterator for Ancestors<'a, T> {
     }
 }
 
-/// The [`Node`]s that have a particular node as a parent.
+/// The [`Nodes`] that have a particular node as a parent.
 ///
 /// Children of a node can be iterated over. The iteration supports no special
 /// qualities and implements [`size_hint`] poorly. Nonetheless it is a fast
@@ -106,11 +112,19 @@ impl<'a, T> DoubleEndedIterator for Ancestors<'a, T> {
 /// # Examples
 ///
 /// ```rust
-/// fn main() -> Result<(), Box<dyn std::error::Error>> {
-///     Ok(())
-/// }
+/// || -> Option<()> {
+///     let tree = read_tree::demo::small_tree();
+///     let mut children = tree.get(2)?.children();
+///
+///     assert_eq!(children.next()?.data(), &121);
+///     assert_eq!(children.next()?.data(), &122);
+///     assert_eq!(children.next()?.data(), &123);
+///
+///     Some(())
+/// }();
 /// ```
 ///
+/// [`Nodes`]: crate::Node
 /// [`size_hint`]: Iterator::size_hint
 #[derive(Debug, Clone)]
 pub struct Children<'a, T> {
@@ -126,8 +140,8 @@ pub struct Children<'a, T> {
     branch: Branch<'a, T>,
 }
 
-impl<'a, T> From<&'a PolyTree<T>> for Children<'a, T> {
-    fn from(tree: &'a PolyTree<T>) -> Self {
+impl<'a, T, ASM> From<&'a PolyTree<T, ASM>> for Children<'a, T> {
+    fn from(tree: &'a PolyTree<T, ASM>) -> Self {
         Children {
             front: 0,
             back: tree.len(),
@@ -142,6 +156,16 @@ impl<'a, T> From<Node<'a, T>> for Children<'a, T> {
             front: node.index() + 1,
             back: node.scope().end() + 1,
             branch: node.into(),
+        }
+    }
+}
+
+impl<'a, T> From<Branch<'a, T>> for Children<'a, T> {
+    fn from(branch: Branch<'a, T>) -> Self {
+        Children {
+            front: 0,
+            back: branch.len(),
+            branch,
         }
     }
 }
@@ -168,7 +192,7 @@ impl<'a, T> Iterator for Children<'a, T> {
     }
 }
 
-/// The [`Node`]s of the subtree underneath a node.
+/// The [`Nodes`] of the subtree underneath a node.
 ///
 /// The descendants of a node are its children and the children of its
 /// descendants.
@@ -179,12 +203,21 @@ impl<'a, T> Iterator for Children<'a, T> {
 /// # Examples
 ///
 /// ```rust
-/// fn main() -> Result<(), Box<dyn std::error::Error>> {
-///     Ok(())
-/// }
+/// || -> Option<()> {
+///     let tree = read_tree::demo::small_tree();
+///     let mut descendants = tree.get(2)?.descendants();
+///
+///     assert_eq!(descendants.next()?.data(), &121);
+///     assert_eq!(descendants.next()?.data(), &122);
+///     assert_eq!(descendants.next()?.data(), &1221);
+///     assert_eq!(descendants.next()?.data(), &1222);
+///     assert_eq!(descendants.next()?.data(), &123);
+///
+///     Some(())
+/// }();
 /// ```
 ///
-/// [`Tree`]: crate::Tree
+/// [`Nodes`]: crate::Node
 #[derive(Debug, Clone)]
 pub struct Descendants<'a, T> {
     /// The [`Index`] of the next node to yield from the front.
@@ -199,8 +232,8 @@ pub struct Descendants<'a, T> {
     branch: Branch<'a, T>,
 }
 
-impl<'a, T> From<&'a Tree<T>> for Descendants<'a, T> {
-    fn from(tree: &'a Tree<T>) -> Self {
+impl<'a, T, ASM> From<&'a Tree<T, ASM>> for Descendants<'a, T> {
+    fn from(tree: &'a Tree<T, ASM>) -> Self {
         Descendants {
             front: 0,
             back: tree.len(),
@@ -209,8 +242,8 @@ impl<'a, T> From<&'a Tree<T>> for Descendants<'a, T> {
     }
 }
 
-impl<'a, T> From<&'a PolyTree<T>> for Descendants<'a, T> {
-    fn from(tree: &'a PolyTree<T>) -> Self {
+impl<'a, T, ASM> From<&'a PolyTree<T, ASM>> for Descendants<'a, T> {
+    fn from(tree: &'a PolyTree<T, ASM>) -> Self {
         Descendants {
             front: 0,
             back: tree.len(),
@@ -225,6 +258,16 @@ impl<'a, T> From<Node<'a, T>> for Descendants<'a, T> {
             front: node.index() + 1,
             back: node.index() + node.len() + 1,
             branch: node.into(),
+        }
+    }
+}
+
+impl<'a, T> From<Branch<'a, T>> for Descendants<'a, T> {
+    fn from(branch: Branch<'a, T>) -> Self {
+        Descendants {
+            front: 0,
+            back: branch.len(),
+            branch,
         }
     }
 }
