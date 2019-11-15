@@ -5,14 +5,15 @@ use std::convert::{TryFrom, TryInto};
 ///
 /// Saplings allow easy creation of new trees. [`Nodes`][Node] are attached to
 /// the tree one at a time until the tree is fully assembled. The sapling is
-/// then converted into a [`Tree`] using [`build`].
+/// then converted into a tree using [`build`].
 ///
 /// Internally a sapling pushes a [`Vertex`] on a
 /// [`Vec`]`<`[`Vertex`]`<T>>` for each added node. It is possible to construct
 /// such a `Vec` yourself. The `Vec` can then be converted into a tree using
 /// [`Tree::from_vec`]. It is often easier to use the methods implemented for
 /// saplings. Saplings also avoid the expensive validation caused by
-/// [`Tree::from_vec`].
+/// [`Tree::from_vec`] by safely using the alternative
+/// [`Tree::from_vec_unchecked`].
 ///
 /// # Examples
 ///
@@ -173,7 +174,7 @@ impl<T, ASM> Sapling<T, ASM> {
     /// # Examples
     ///
     /// ```rust
-    /// use read_tree::Sapling;;
+    /// use read_tree::Sapling;
     ///
     /// let mut sap = Sapling::new();
     /// assert_eq!(sap.is_complete(), true);
@@ -193,6 +194,57 @@ impl<T, ASM> Sapling<T, ASM> {
         self.open.is_empty()
     }
 
+    /// Returns `()` if the sapling can successfully be [`built`][build] into a
+    /// [`Tree`].
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Sapling::build`].
+    ///
+    /// # Examples
+    ///
+    /// This method is useful for asserting a sapling can be built without
+    /// consuming the sapling. The following example is somewhat contrived and
+    /// should not be used.
+    ///
+    /// ```rust
+    /// use read_tree::{Node, Sapling};
+    ///
+    /// let mut sap = Sapling::new();
+    /// sap.push_leaf(());
+    ///
+    /// // `debug_assert!` will panic only during unoptimized builds. We use it
+    /// // whenever we think the check will never fail, but want to be extra sure
+    /// // without lowering performance in optimized builds.
+    /// debug_assert!(sap.can_build().is_ok());
+    ///
+    /// // The following unsafe code is safe because `Sapling::can_build` ensures
+    /// // the sapling contains a valid `Tree` and could be converted using
+    /// // `Sapling::build`. We can now get a `Node` representing the tree in
+    /// // `sap` without converting the sapling.
+    /// let _node = unsafe { Node::from_slice_unchecked(sap.as_slice()) };
+    /// ```
+    ///
+    /// The recommended way of doing the above would be the following. Notice
+    /// that [`Sapling::build`] will perform some additional validations that
+    /// the above code only performs in unoptimized builds.
+    ///
+    /// ```rust
+    /// use read_tree::Sapling;
+    ///
+    /// fn main() -> Result<(), Box<dyn std::error::Error>> {
+    ///     let mut sap = Sapling::new();
+    ///     sap.push_leaf(());
+    ///
+    ///     let tree = sap.build()?;
+    ///     let _node = tree.as_node();
+    ///     sap = tree.into();
+    ///
+    ///     Ok(())
+    /// }
+    /// ```
+    ///
+    /// [build]: Sapling::build
     pub fn can_build(&self) -> Result<(), BuildError> {
         if self.is_empty() {
             return Err(BuildError::Empty);
