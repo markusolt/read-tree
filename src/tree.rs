@@ -123,6 +123,29 @@ impl<T, ASM> Sapling<T, ASM> {
         self.verts.clear();
     }
 
+    pub fn clear_asm<ASM2>(mut self) -> Sapling<T, ASM2> {
+        self.clear();
+
+        Sapling {
+            open: Vec::new(),
+            verts: self.verts,
+        }
+    }
+
+    pub fn with_asm_default<ASM2>(self) -> Sapling<T, ASM2>
+    where
+        ASM2: Default,
+    {
+        Sapling {
+            open: self
+                .open
+                .iter()
+                .map(|(i, _)| (*i, ASM2::default()))
+                .collect(),
+            verts: self.verts,
+        }
+    }
+
     pub fn as_slice(&self) -> &[Vertex<T>] {
         &self.verts[..]
     }
