@@ -162,17 +162,23 @@ impl<'a, T, ASM> From<&'a Tree<T, ASM>> for Node<'a, T> {
     }
 }
 
-impl<'a, T> TryFrom<&'a [Vertex<T>]> for Node<'a, T> {
+impl<'a, T> TryFrom<Branch<'a, T>> for Node<'a, T> {
     type Error = ValidationError;
 
-    fn try_from(slice: &'a [Vertex<T>]) -> Result<Self, Self::Error> {
-        let branch = Branch::try_from(slice)?;
-
+    fn try_from(branch: Branch<'a, T>) -> Result<Self, Self::Error> {
         if branch.get(0).unwrap().len() + 1 != branch.len() {
             return Err(ValidationError::MultipleRoots);
         }
 
         Ok(branch.get(0).unwrap())
+    }
+}
+
+impl<'a, T> TryFrom<&'a [Vertex<T>]> for Node<'a, T> {
+    type Error = ValidationError;
+
+    fn try_from(slice: &'a [Vertex<T>]) -> Result<Self, Self::Error> {
+        Branch::try_from(slice)?.try_into()
     }
 }
 
