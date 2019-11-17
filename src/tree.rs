@@ -1,4 +1,4 @@
-use crate::{BuildError, ErrorWith, Node, ValidationError};
+use crate::{Branch, BuildError, Children, ErrorWith, Node, ValidationError};
 use std::convert::{TryFrom, TryInto};
 
 /// An internal type that stores the payload and relationships of a [`Node`].
@@ -408,6 +408,13 @@ impl<T, ASM> Sapling<T, ASM> {
         self.verts.extend_from_slice(node.as_slice());
     }
 
+    pub fn push_branch<'a>(&mut self, branch: Branch<'a, T>)
+    where
+        T: Clone,
+    {
+        self.verts.extend_from_slice(branch.as_slice());
+    }
+
     pub fn peek(&self) -> Option<&T> {
         let (i, _) = self.open.last()?;
 
@@ -657,7 +664,7 @@ impl<T, ASM> TryFrom<PolyTree<T, ASM>> for Tree<T, ASM> {
     type Error = ErrorWith<ValidationError, PolyTree<T, ASM>>;
 
     fn try_from(tree: PolyTree<T, ASM>) -> Result<Self, Self::Error> {
-        if tree.verts()[0].len < tree.verts().len() - 1 {
+        if tree.as_slice()[0].len < tree.as_slice().len() - 1 {
             return Err(ErrorWith::new(ValidationError::MultipleRoots, tree));
         }
 
@@ -681,13 +688,56 @@ pub struct PolyTree<T, ASM = ()> {
     pub(crate) sap: Sapling<T, ASM>,
 }
 
+impl<T> PolyTree<T> {
+    pub fn from_vec(
+        vec: Vec<Vertex<T>>,
+    ) -> Result<Self, ErrorWith<ValidationError, Vec<Vertex<T>>>> {
+        vec.try_into()
+    }
+
+    pub unsafe fn from_vec_unchecked(vec: Vec<Vertex<T>>) -> Self {
+        PolyTree {
+            sap: Sapling {
+                open: Vec::new(),
+                verts: vec,
+            },
+        }
+    }
+}
+
 impl<T, ASM> PolyTree<T, ASM> {
+    pub fn roots(&self) -> Children<T> {
+        self.into()
+    }
+
+    pub fn as_slice(&self) -> &[Vertex<T>] {
+        self.sap.as_slice()
+    }
+
     pub fn len(&self) -> usize {
         self.sap.len()
     }
 
-    pub fn verts(&self) -> &[Vertex<T>] {
-        self.sap.as_slice()
+    pub fn get(&self, index: usize) -> Option<Node<T>> {
+        if index >= self.sap.len() {
+            return None;
+        }
+
+        Some(Node {
+            index,
+            verts: self.as_slice(),
+        })
+    }
+}
+
+impl<'a, T> From<Branch<'a, T>> for PolyTree<T>
+where
+    T: Clone,
+{
+    fn from(branch: Branch<'a, T>) -> Self {
+        let mut sap = Sapling::new();
+        sap.push_branch(branch);
+        PolyTree { sap }
     }
 }
 
@@ -704,6 +754,17 @@ impl<T, ASM> TryFrom<Sapling<T, ASM>> for PolyTree<T, ASM> {
         match sap.can_build_polytree() {
             Ok(_) => Ok(PolyTree { sap }),
             Err(err) => Err(ErrorWith::new(err, sap)),
+        }
+    }
+}
+
+impl<T> TryFrom<Vec<Vertex<T>>> for PolyTree<T> {
+    type Error = ErrorWith<ValidationError, Vec<Vertex<T>>>;
+
+    fn try_from(vec: Vec<Vertex<T>>) -> Result<Self, Self::Error> {
+        match Branch::try_from(&vec[..]) {
+            Ok(_) => Ok(unsafe { PolyTree::from_vec_unchecked(vec) }),
+            Err(err) => Err(ErrorWith::new(err, vec)),
         }
     }
 }
