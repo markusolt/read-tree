@@ -1,5 +1,38 @@
-use crate::{BuildError, ErrorWith, Node, ValidationError, Vertex};
+use crate::{BuildError, ErrorWith, Node, ValidationError};
 use std::convert::{TryFrom, TryInto};
+
+/// An internal type that stores the payload and relationships of a [`Node`].
+///
+/// Every node on a tree is represented by a [`Vertex`]. The `len` field stores
+/// the number of [`Descendants`] the node has. A leaf node has length `0`.
+///
+/// Every [`Tree`]`<T>` contains a [`Vec`]`<`[`Vertex`]`<T>>` representing the
+/// nodes in a depth first order; meaning every vertex is followed by its first
+/// child. This makes it very easy to take a slice of the vertex buffer that
+/// represents a subtree.
+///
+/// The type implements [`Clone`] and [`Copy`] as long as the payload `T`
+/// implements the same. Supporting [`Copy`] is important to ensure
+/// [`Vec::extend_from_slice`] executes as fast as possible. This method is used
+/// by [`Sapling::push_node`] to copy the subtree of a node into a sapling.
+///
+/// [`Descendants`]: crate::Descendants
+/// [`Sapling::push_node`]: crate::Sapling::push_node
+#[derive(Debug, Clone, Copy)]
+pub struct Vertex<T> {
+    pub data: T,
+    pub len: usize,
+}
+
+impl<T> Vertex<T> {
+    /// Returns a new vertex with payload `data` intending to own `len` many
+    /// [`Descendants`].
+    ///
+    /// [`Descendants`]: crate::Descendants
+    pub fn new(data: T, len: usize) -> Self {
+        Vertex { data, len }
+    }
+}
 
 /// Builder struct for [`Trees`][Tree].
 ///
@@ -123,6 +156,22 @@ impl<T, ASM> Sapling<T, ASM> {
         self.verts.clear();
     }
 
+    /// Empties the sapling and changes its [`Assembly Information`] type.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use read_tree::Sapling;
+    ///
+    /// let mut sap: Sapling<(), usize> = Sapling::new_asm();
+    /// sap.push_asm((), 4);
+    /// assert_eq!(sap.peek_asm().unwrap().1, &4);
+    ///
+    /// let mut sap: Sapling<(), bool> = sap.clear_asm();
+    /// assert!(sap.is_empty());
+    /// ```
+    ///
+    /// [`Assembly Information`]: crate::vocab::AssemblyInformation
     pub fn clear_asm<ASM2>(mut self) -> Sapling<T, ASM2> {
         self.clear();
 
@@ -132,6 +181,26 @@ impl<T, ASM> Sapling<T, ASM> {
         }
     }
 
+    /// Changes the saplings [`Assembly Information`] type. Resets the assembly
+    /// information of all open nodes to `ASM::default()`.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use read_tree::Sapling;
+    ///
+    /// let mut sap: Sapling<(), usize> = Sapling::new_asm();
+    /// sap.push_asm((), 4);
+    /// assert_eq!(sap.peek_asm().unwrap().1, &4);
+    ///
+    /// let mut sap: Sapling<(), bool> = sap.with_asm_default();
+    /// assert_eq!(sap.peek_asm().unwrap().1, &false);
+    ///
+    /// sap.pop();
+    /// assert!(sap.build().is_ok());
+    /// ```
+    ///
+    /// [`Assembly Information`]: crate::vocab::AssemblyInformation
     pub fn with_asm_default<ASM2>(self) -> Sapling<T, ASM2>
     where
         ASM2: Default,
@@ -282,6 +351,15 @@ impl<T, ASM> Sapling<T, ASM> {
         Ok(())
     }
 
+    /// Returns `()` if the sapling can successfully be
+    /// [`built`][build_polytree] into a [`PolyTree`]. Similar to
+    /// [`Sapling::can_build`].
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Sapling::build_polytree`].
+    ///
+    /// [build_polytree]: Sapling::build_polytree
     pub fn can_build_polytree(&self) -> Result<(), BuildError> {
         if self.is_empty() {
             return Err(BuildError::Empty);

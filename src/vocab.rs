@@ -161,3 +161,44 @@ impl<'a, T> From<Node<'a, T>> for Index {
         }
     }
 }
+
+/// Information stored for open [`Nodes`][Node] on [`Saplings`][Sapling].
+///
+/// Saplings have a second generic `ASM`. Values of this type are stored for
+/// nodes on the sapling until the nodes are closed. By default this type is
+/// `()`. To create a sapling with a different `ASM` use [`Sapling::new_asm`] to
+/// construct it. Many methods on sapling have a `_asm` alternative.
+///
+/// When adding nodes to a sapling with [`push_asm`] the paramter `asm`
+/// specifies a value that is stored for the node until closed. The assembly
+/// information can be updated by [`peeking`] the node. After a node is
+/// [`popped`] the assembly information can be used to update the nodes payload.
+///
+/// # Examples
+///
+/// ```rust
+/// use read_tree::Sapling;
+///
+/// let mut sap = Sapling::<bool, usize>::new_asm();
+/// sap.push_asm(true, 0);
+///
+/// for i in 1..=5 {
+///     sap.push_leaf(i % 2 == 0);
+///     let (_, asm): (&mut bool, &mut usize) = sap.peek_asm_mut().unwrap();
+///     std::mem::replace(asm, *asm + i);
+/// }
+///
+/// let (root_data, root_asm): (&mut bool, usize) = sap.pop_asm().unwrap();
+/// assert_eq!(root_asm, 15);
+/// std::mem::replace(root_data, root_asm % 2 == 0);
+///
+/// let tree = sap.build().unwrap();
+/// assert_eq!(tree.get(0).unwrap().data(), &false);
+/// ```
+///
+/// [`peeking`]: crate::Sapling::peek_asm_mut
+/// [`popped`]: crate::Sapling::pop_asm
+/// [`push_asm`]: crate::Sapling::push_asm
+/// [`Sapling::new_asm`]: crate::Sapling::new_asm
+/// [Sapling]: crate::Sapling
+pub struct AssemblyInformation;

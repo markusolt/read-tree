@@ -54,7 +54,6 @@ mod error;
 mod iter;
 mod node;
 mod tree;
-mod vertex;
 
 pub mod demo;
 pub mod vocab;
@@ -63,7 +62,6 @@ pub use branch::Branch;
 pub use error::{BuildError, ErrorWith, ValidationError};
 pub use iter::{Ancestors, Children, Descendants};
 pub use node::Node;
-pub use tree::{PolyTree, Sapling, Tree};
-pub use vertex::Vertex;
+pub use tree::{PolyTree, Sapling, Tree, Vertex};
 
 // mod test;
