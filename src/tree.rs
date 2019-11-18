@@ -18,7 +18,7 @@ use std::convert::{TryFrom, TryInto};
 ///
 /// [`Descendants`]: crate::Descendants
 /// [`Sapling::push_node`]: crate::Sapling::push_node
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy)]
 pub struct Vertex<T> {
     pub data: T,
     pub len: usize,
@@ -112,16 +112,25 @@ pub struct Sapling<T, ASM = ()> {
 }
 
 impl<T> Sapling<T> {
+    /// Creates a new empty sapling.
     pub fn new() -> Self {
         Sapling::new_asm()
     }
 
+    /// Creates a new empty sapling with capacity for `len` many [`Nodes`][Node]
+    /// and a maximal depth of `depth`. If the maximum depth of the tree is not
+    /// known use `None` for `depth`.
     pub fn with_capacity(len: usize, depth: Option<usize>) -> Self {
         Sapling::with_capacity_asm(len, depth)
     }
 }
 
 impl<T, ASM> Sapling<T, ASM> {
+    /// Similar to [`new`] but allows specifying a type for
+    /// [`AssemblyInformation`].
+    ///
+    /// [`AssemblyInformation`]: crate::vocab::AssemblyInformation
+    /// [`new`]: Sapling::new
     pub fn new_asm() -> Self {
         Sapling {
             open: Vec::new(),
@@ -129,6 +138,11 @@ impl<T, ASM> Sapling<T, ASM> {
         }
     }
 
+    /// Similar to [`with_capacity`] but allows specifying a type for
+    /// [`AssemblyInformation`].
+    ///
+    /// [`AssemblyInformation`]: crate::vocab::AssemblyInformation
+    /// [`with_capacity`]: Sapling::with_capacity
     pub fn with_capacity_asm(len: usize, depth: Option<usize>) -> Self {
         Sapling {
             open: Vec::with_capacity(depth.unwrap_or(0)),
@@ -588,18 +602,127 @@ where
     }
 }
 
+/// A tree data structure.
+///
+/// A tree has exactly one root [`Node`], and every node has an arbitrary number
+/// of [`Children`]. Once a tree has been constructed it can no longer be
+/// modified. Trees can be converted back into [`Saplings`][Sapling] primarily
+/// to reuse buffers when constructing an entirely new tree.
+///
+/// Alternatively trees can be constructed as a [`Vec`]`<`[`Vertex`]`<T>>` by
+/// the caller and upgraded into a tree using [`from_vec`].
+///
+/// # Examples
+///
+/// The first example shows how to construct a tree using a sapling. It is the
+/// recommended way of constructing trees. After construction we get a
+/// particular node from the tree using its [`Index`] `2`. To see more examples
+/// of interactions with nodes see [`Node`].
+///
+/// ```rust
+/// use read_tree::Sapling;
+///
+/// fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     let mut sap = Sapling::new();
+///
+///     sap.push(1);
+///     sap.push(11);
+///     sap.push(111); // The index of this node will be `2`
+///     sap.push_leaf(1111);
+///     sap.push_leaf(1112);
+///
+///     sap.pop(); // close `111`
+///     sap.pop(); // close `11`
+///     sap.pop(); // close `1`
+///
+///     let tree = sap.build()?;
+///
+///     let node = tree.get(2).unwrap(); // get node `111`
+///     assert_eq!(node.data(), &111);
+///
+///     assert!(node.ancestors().map(|n| n.data()).eq([11, 1].iter()));
+///     assert!(node.children().map(|n| n.data()).eq([1111, 1112].iter()));
+///
+///     Ok(())
+/// }
+/// ```
+///
+/// The second example constructs the same tree as the first, but without using
+/// a sapling. The paramter `len` of vertices specifies the number of
+/// [`Descendants`] the node has. For this tree the values of `len` are `[4, 3,
+/// 2, 0, 0]`, indicating the root node contains all `4` remaining nodes, and
+/// that the last two nodes are leaf nodes.
+///
+/// ```rust
+/// use read_tree::{Tree, Vertex};
+///
+/// fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     let vec = [(1, 4), (11, 3), (111, 2), (1111, 0), (1112, 0)]
+///         .iter()
+///         .map(|(data, len)| Vertex::new(*data, *len))
+///         .collect();
+///     let _tree = Tree::from_vec(vec)?;
+///
+///     Ok(())
+/// }
+/// ```
+///
+/// [`Descendants`]: crate::Descendants
+/// [`from_vec`]: Tree::from_vec
+/// [`Index`]: crate::vocab::Index
 #[derive(Debug, Clone)]
 pub struct Tree<T, ASM = ()> {
     pub(crate) sap: Sapling<T, ASM>,
 }
 
 impl<T> Tree<T> {
+    /// Turns a [`Vec`]`<`[`Vertex`]`<T>>` into a [`Tree`], after performing
+    /// some validations.
+    ///
+    /// To avoid validations; which have a significant cost for a large `vec`;
+    /// use the unsafe alternative [`from_vec_unchecked`].
+    ///
+    /// # Errors
+    ///
+    /// If the `vec` does not contain a valid tree structure one of the
+    /// following errors is returned.
+    ///
+    /// 1. `Empty`
+    ///
+    ///    The `vec` must not be empty.
+    /// 2. `MutlipleRoots`
+    ///
+    ///    The [`Scope`] of the first vertex must contain the entire `vec`.
+    /// 3. `IllegalStructure`
+    ///
+    ///    The scope of every vertex in the `vec` must be contained in the
+    ///    scope of its parent.
+    ///
+    /// [`from_vec_unchecked`]: Tree::from_vec_unchecked
+    /// [`Scope`]: crate::vocab::Scope
     pub fn from_vec(
         vec: Vec<Vertex<T>>,
     ) -> Result<Self, ErrorWith<ValidationError, Vec<Vertex<T>>>> {
         vec.try_into()
     }
 
+    /// Turns a [`Vec`]`<`[`Vertex`]`<T>>` into a [`Tree`].
+    ///
+    /// This is the unsafe alternative to [`from_vec`]. The cost of this method
+    /// is free.
+    ///
+    /// # Safety
+    ///
+    /// The caller must guarantee that all expected qualities of `vec` are
+    /// fulfilled.
+    ///
+    /// 1. `vec` must not be empty.
+    /// 2. The [`Scope`] of the first vertex must contain the entire `vec`.
+    /// 3. The scope of every vertex in `vec` must be contained in the scope of
+    ///    its parent.
+    ///
+    /// [`from_vec`]: Tree::from_vec
+    /// [`Scope`]: crate::vocab::Scope
     pub unsafe fn from_vec_unchecked(vec: Vec<Vertex<T>>) -> Self {
         Tree {
             sap: Sapling {
@@ -683,18 +806,101 @@ impl<T> TryFrom<Vec<Vertex<T>>> for Tree<T> {
     }
 }
 
+/// A tree data structure with multiple roots.
+///
+/// A polytree has at least one root [`Node`], and every node has an arbitrary
+/// number of [`Children`]. A less restrictive version of [`Tree`].
+///
+/// # Examples
+///
+/// The first example shows how to construct a polytree using a sapling.
+///
+/// ```rust
+/// use read_tree::Sapling;
+///
+/// fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     let mut sap = Sapling::new();
+///
+///     sap.push(1);
+///     sap.push_leaf(11);
+///     sap.pop(); // close `1`
+///
+///     sap.push_leaf(2); // A second root node
+///
+///     let tree = sap.build_polytree()?;
+///     assert!(tree.roots().map(|n| n.data()).eq([1, 2].iter()));
+///
+///     Ok(())
+/// }
+/// ```
+///
+/// The second example constructs the same polytree as the first, but without
+/// using a sapling.
+///
+/// ```rust
+/// use read_tree::{PolyTree, Vertex};
+///
+/// fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     let vec = [(1, 1), (11, 0), (2, 0)]
+///         .iter()
+///         .map(|(data, len)| Vertex::new(*data, *len))
+///         .collect();
+///     let _tree = PolyTree::from_vec(vec)?;
+///
+///     Ok(())
+/// }
+/// ```
+///
+/// [`from_vec`]: PolyTree::from_vec
 #[derive(Debug, Clone)]
 pub struct PolyTree<T, ASM = ()> {
     pub(crate) sap: Sapling<T, ASM>,
 }
 
 impl<T> PolyTree<T> {
+    /// Turns a [`Vec`]`<`[`Vertex`]`<T>>` into a [`PolyTree`], after performing
+    /// some validations.
+    ///
+    /// To avoid validations; which have a significant cost for a large `vec`;
+    /// use the unsafe alternative [`from_vec_unchecked`].
+    ///
+    /// # Errors
+    ///
+    /// If the `vec` does not contain a valid polytree structure one of the
+    /// following errors is returned.
+    ///
+    /// 1. `Empty`
+    ///
+    ///    The `vec` must not be empty.
+    /// 2. `IllegalStructure`
+    ///
+    ///    The scope of every vertex in the `vec` must be contained in the
+    ///    scope of its parent.
+    ///
+    /// [`from_vec_unchecked`]: PolyTree::from_vec_unchecked
+    /// [`Scope`]: crate::vocab::Scope
     pub fn from_vec(
         vec: Vec<Vertex<T>>,
     ) -> Result<Self, ErrorWith<ValidationError, Vec<Vertex<T>>>> {
         vec.try_into()
     }
 
+    /// Turns a [`Vec`]`<`[`Vertex`]`<T>>` into a [`PolyTree`].
+    ///
+    /// This is the unsafe alternative to [`from_vec`]. The cost of this method
+    /// is free.
+    ///
+    /// # Safety
+    ///
+    /// The caller must guarantee that all expected qualities of `vec` are
+    /// fulfilled.
+    ///
+    /// 1. `vec` must not be empty.
+    /// 3. The scope of every vertex in `vec` must be contained in the scope of
+    ///    its parent.
+    ///
+    /// [`from_vec`]: PolyTree::from_vec
+    /// [`Scope`]: crate::vocab::Scope
     pub unsafe fn from_vec_unchecked(vec: Vec<Vertex<T>>) -> Self {
         PolyTree {
             sap: Sapling {

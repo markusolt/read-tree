@@ -103,6 +103,41 @@ impl<'a, T> Node<'a, T> {
     }
 
     /// Returns the internal slice of [`Vertices`][Vertex].
+    ///
+    /// # Examples
+    ///
+    /// The first example illustrates that the slice not only represents the
+    /// node and its [`Descendants`], but may be wider than expected. This is
+    /// necessary to access [`Ancestors`] from the node.
+    ///
+    /// ```rust
+    /// let tree = read_tree::demo::small_tree();
+    /// let node = tree.get(4).unwrap();
+    ///
+    /// // Although the node is deep within the tree, its slice matches the
+    /// // complete slice of the tree.
+    /// assert_eq!(tree.as_slice(), node.as_slice());
+    /// assert_eq!(node.data(), &node.as_slice()[node.index()].data);
+    ///
+    /// // The `len` of the slice is entirely independent of the nodes `len`.
+    /// assert_eq!(node.len(), 2);
+    /// assert_eq!(node.as_slice().len(), 8);
+    /// ```
+    ///
+    /// The second example shows that an [`isolated`] node returns a more
+    /// intuitive slice. The slice now only contains the vertices of the node
+    /// itself and its descendants.
+    ///
+    /// ```rust
+    /// let tree = read_tree::demo::small_tree();
+    /// let node = tree.get(4).unwrap().isolated();
+    /// assert_eq!(node.index(), 0);
+    ///
+    /// assert_eq!(node.data(), &node.as_slice()[0].data);
+    /// assert_eq!(node.as_slice().len(), node.len() + 1);
+    /// ```
+    ///
+    /// [`isolated`]: Node::isolated
     pub fn as_slice(self) -> &'a [Vertex<T>] {
         &self.verts[..]
     }
